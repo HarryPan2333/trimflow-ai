@@ -18,9 +18,9 @@ TrimFlow AI（服装辅料外贸销售助手）是一个面向中国服装辅料
 需要 Node.js `22.13.0` 或更高版本。
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env.local
-npm run dev
+pnpm dev
 ```
 
 打开 [http://localhost:3000](http://localhost:3000)。
@@ -37,11 +37,11 @@ OPENAI_MODEL=gpt-5.6
 ## 质量检查
 
 ```bash
-npm run lint
-npm run build
+pnpm lint
+pnpm build
 ```
 
-`npm run build` 使用标准 Next.js production build，可直接用于 Vercel。
+`pnpm build` 使用标准 Next.js production build，可直接用于 Vercel。
 
 ## 部署到 Vercel
 
@@ -49,7 +49,7 @@ npm run build
 
 1. 将项目上传到私有或公开 GitHub 仓库。
 2. 在 Vercel 中选择 **Add New → Project**，导入该仓库。
-3. Framework Preset 选择 **Next.js**，Build Command 使用默认的 `npm run build`。
+3. Framework Preset 选择 **Next.js**，Build Command 使用默认的 `pnpm build`。
 4. 如果只演示模拟 AI，无需配置环境变量。
 5. 如需真实 AI，在 Vercel 项目的 **Settings → Environment Variables** 中添加 `OPENAI_API_KEY`，可选添加 `OPENAI_MODEL`。Key 只能配置在服务器端环境变量中。
 6. 点击 Deploy。
@@ -57,8 +57,8 @@ npm run build
 ### 通过 Vercel CLI
 
 ```bash
-npx vercel
-npx vercel --prod
+pnpm dlx vercel
+pnpm dlx vercel --prod
 ```
 
 部署完成后，Vercel 会返回预览地址和生产地址。
@@ -74,8 +74,8 @@ npx vercel --prod
 ## 常用命令
 
 ```bash
-npm run dev
-npm run lint
-npm run build
-npm run start
+pnpm dev
+pnpm lint
+pnpm build
+pnpm start
 ```

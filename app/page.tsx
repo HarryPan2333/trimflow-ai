@@ -1,154 +1,28 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { EmptyState } from "../components/business/empty-state";
+import { HealthBadge } from "../components/business/health-badge";
+import { StatusBadge } from "../components/business/status-badge";
+import { DashboardView } from "../components/dashboard/dashboard-view";
+import { PageHeader } from "../components/layout/page-header";
+import { WorkspaceShell, workspaceNavigation } from "../components/layout/workspace-shell";
+import type { InterfaceLanguage, WorkspaceView } from "../components/layout/workspace-shell";
+import type { GlobalCreateType } from "../components/layout/workspace-shell";
 import { Badge, Button, Card, Modal } from "../components/ui/primitives";
+import {
+  legacyActivityRows as activities,
+  legacyRequirementRows as requirements,
+  projects as initialProjects,
+  projectStages as stages,
+  tasks as mockTasks,
+} from "../lib/mock-data";
+import type { Project, ProjectStage as Stage } from "../lib/mock-data";
 
-type Stage =
-  | "新询盘"
-  | "需求确认"
-  | "打样中"
-  | "报价中"
-  | "谈判中"
-  | "已确认订单"
-  | "暂停或流失";
 type OutputLanguage = "中文" | "英文" | "中英对照";
-type View = "dashboard" | "projects" | "detail" | "todos" | "reports" | "templates" | "settings";
+type View = WorkspaceView | "detail";
 
-type Project = {
-  id: number;
-  code: string;
-  name: string;
-  customer: string;
-  region: string;
-  product: string;
-  stage: Stage;
-  progress: string;
-  owner: string;
-  next: string;
-  updated: string;
-  quantity: string;
-  delivery: string;
-  health: "良好" | "关注" | "风险";
-  contact: string;
-  email: string;
-  initials: string;
-  color: string;
-};
-
-const stages: Stage[] = ["新询盘", "需求确认", "打样中", "报价中", "谈判中", "已确认订单", "暂停或流失"];
-
-const initialProjects: Project[] = [
-  {
-    id: 1,
-    code: "NAS-2407",
-    name: "北美运动服装品牌——防水拉链开发",
-    customer: "North American Sportswear Brand",
-    region: "美国 · 西雅图",
-    product: "防水尼龙拉链",
-    stage: "打样中",
-    progress: "第二版样品已寄出，等待防泼水测试反馈",
-    owner: "陈晨",
-    next: "7 月 30 日前跟进客户测试结果",
-    updated: "今天 10:24",
-    quantity: "120,000 条 / 年",
-    delivery: "2026 年 10 月 15 日",
-    health: "良好",
-    contact: "Olivia Reed · Product Developer",
-    email: "olivia.reed@example-client.com",
-    initials: "NA",
-    color: "#275d84",
-  },
-  {
-    id: 2,
-    code: "EFC-2411",
-    name: "欧洲时尚品牌——金属纽扣项目",
-    customer: "European Fashion Client",
-    region: "法国 · 巴黎",
-    product: "锌合金四合扣",
-    stage: "报价中",
-    progress: "已提交 V2 阶梯报价，客户正在内部评估",
-    owner: "王璐",
-    next: "补充 REACH 测试费用与模具费说明",
-    updated: "昨天 16:40",
-    quantity: "80,000 套",
-    delivery: "2026 年 11 月 20 日",
-    health: "关注",
-    contact: "Camille Bernard · Buyer",
-    email: "camille.bernard@example-client.com",
-    initials: "EU",
-    color: "#7d5d47",
-  },
-  {
-    id: 3,
-    code: "EYW-2502",
-    name: "瑜伽服品牌——2027服装辅料系列",
-    customer: "Emerging Yoga Wear Brand",
-    region: "澳大利亚 · 墨尔本",
-    product: "隐形拉链、绳扣、织带",
-    stage: "需求确认",
-    progress: "已收到概念板，仍需确认三组 Pantone 色号",
-    owner: "林薇",
-    next: "发送产品规格确认表与颜色选项",
-    updated: "7 月 26 日 14:12",
-    quantity: "首单约 45,000 件套",
-    delivery: "2027 年 1 月 10 日",
-    health: "关注",
-    contact: "Mia Collins · Founder",
-    email: "mia.collins@example-client.com",
-    initials: "YW",
-    color: "#48645b",
-  },
-  {
-    id: 4,
-    code: "OC-2418",
-    name: "户外服饰客户——反光绳扣升级",
-    customer: "Outdoor Clothing Client",
-    region: "德国 · 汉堡",
-    product: "反光绳扣",
-    stage: "谈判中",
-    progress: "客户要求在原报价基础上降低 4%",
-    owner: "陈晨",
-    next: "准备数量阶梯与材质替代方案",
-    updated: "7 月 25 日 09:30",
-    quantity: "200,000 个",
-    delivery: "2026 年 12 月 5 日",
-    health: "风险",
-    contact: "Jonas Weber · Sourcing Manager",
-    email: "jonas.weber@example-client.com",
-    initials: "OC",
-    color: "#6b6842",
-  },
-];
-
-const requirements = [
-  ["产品类型 / Product Type", "TPU 膜防水尼龙拉链", "已确认"],
-  ["材质 / Material", "尼龙链牙 + TPU 膜", "已确认"],
-  ["颜色 / Color", "Black C、Cool Gray 11 C", "已确认"],
-  ["尺寸 / Size", "#5", "已确认"],
-  ["拉链长度 / Zipper Length", "58 cm / 64 cm / 72 cm", "已确认"],
-  ["表面处理 / Surface Finish", "哑光膜面", "已确认"],
-  ["定制 Logo / Customized Logo", "拉片激光雕刻客户代号", "待确认"],
-  ["预计数量 / Estimated Quantity", "120,000 条 / 年", "已确认"],
-  ["测试标准 / Testing Standard", "AATCC 22；5 次水洗后 ≥ 80 分", "有冲突"],
-  ["目标价格 / Target Price", "USD 0.82 / 条", "待确认"],
-  ["目标交期 / Target Delivery Date", "2026-10-15", "已确认"],
-];
-
-const activities = [
-  { date: "今天 10:24", title: "样品物流状态更新", text: "V2 样品已由 DHL 签收，收件人为 Olivia Reed。", icon: "✓" },
-  { date: "7 月 27 日 16:08", title: "客户邮件", text: "客户确认优先测试 64 cm 黑色样品，并询问水洗后的防泼水性能。", icon: "✉" },
-  { date: "7 月 26 日 11:32", title: "内部备注", text: "技术部建议将标准调整为水洗 3 次后防泼水等级不低于 80 分，需与客户确认。", icon: "▣" },
-  { date: "7 月 24 日 15:45", title: "V2 样品寄出", text: "黑色、灰色各 6 条；运单号为模拟数据 TF24072401。", icon: "↗" },
-];
-
-const nav = [
-  { id: "dashboard" as View, label: "工作台", en: "Workspace", icon: "⌂" },
-  { id: "projects" as View, label: "客户项目", en: "Projects", icon: "▦" },
-  { id: "todos" as View, label: "待办事项", en: "Tasks", icon: "✓" },
-  { id: "reports" as View, label: "周报中心", en: "Reports", icon: "▤" },
-  { id: "templates" as View, label: "模板中心", en: "Templates", icon: "▧" },
-  { id: "settings" as View, label: "设置", en: "Settings", icon: "⚙" },
-];
+const placeholderViews = new Set<WorkspaceView>(["clients", "samples", "quotations", "orders", "fulfillment"]);
 
 const aiPrompts = ["总结当前项目", "还有哪些信息待确认？", "生成下一步行动", "生成客户英文回复", "生成内部中文任务单", "生成项目周报", "准备价格谈判方案", "当前项目有哪些风险？"];
 
@@ -195,115 +69,6 @@ const aiContent: Record<string, { title: string; zh: string; en: string }> = {
   },
 };
 
-function PageHeader({ title, subtitle, actions }: { title: string; subtitle: string; actions?: React.ReactNode }) {
-  return (
-    <div className="page-head">
-      <div>
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-      </div>
-      <div className="page-actions">{actions}</div>
-    </div>
-  );
-}
-
-function StageBadge({ stage }: { stage: Stage }) {
-  const tone: Record<Stage, string> = {
-    新询盘: "blue",
-    需求确认: "amber",
-    打样中: "purple",
-    报价中: "cyan",
-    谈判中: "orange",
-    已确认订单: "green",
-    暂停或流失: "neutral",
-  };
-  return <Badge tone={tone[stage]}>{stage}</Badge>;
-}
-
-function Dashboard({ projects, openProject, goProjects, openNew }: { projects: Project[]; openProject: (p: Project) => void; goProjects: () => void; openNew: () => void }) {
-  const metrics = [
-    ["进行中的项目", "12", "较上周 +2", "briefcase"],
-    ["待回复客户", "4", "其中 2 项已超过 24 小时", "mail"],
-    ["打样中的项目", "3", "1 项本周待寄出", "sample"],
-    ["待报价项目", "2", "预计总数量 200K+", "quote"],
-    ["本周待办", "9", "今日到期 3 项", "check"],
-  ];
-  return (
-    <>
-      <PageHeader
-        title="销售工作台"
-        subtitle="早上好，陈晨。以下是你今天需要关注的客户项目。"
-        actions={<><Button variant="secondary" onClick={goProjects}>查看全部项目</Button><Button onClick={openNew}>＋ 新建项目</Button></>}
-      />
-      <div className="metrics">
-        {metrics.map(([label, value, detail, icon]) => (
-          <Card key={label} className="metric-card">
-            <div className={`metric-icon icon-${icon}`}>{icon === "briefcase" ? "▣" : icon === "mail" ? "✉" : icon === "sample" ? "◈" : icon === "quote" ? "¥" : "✓"}</div>
-            <span>{label}</span>
-            <strong>{value}</strong>
-            <small>{detail}</small>
-          </Card>
-        ))}
-      </div>
-      <div className="section-title">
-        <div><h2>销售阶段看板</h2><p>按当前阶段查看项目分布与下一步动作</p></div>
-        <span className="muted">共 16 个项目</span>
-      </div>
-      <div className="kanban">
-        {stages.map((stage, idx) => {
-          const match = projects.find((p) => p.stage === stage);
-          return (
-            <div className="kanban-column" key={stage}>
-              <div className="kanban-head"><span className={`stage-dot dot-${idx}`} />{stage}<b>{[2, 3, 3, 2, 2, 3, 1][idx]}</b></div>
-              {match ? (
-                <button className="kanban-card" onClick={() => openProject(match)}>
-                  <span className="project-code">{match.code}</span>
-                  <strong>{match.name.split("——")[1] || match.name}</strong>
-                  <p>{match.customer}</p>
-                  <div className="kanban-meta"><span>{match.owner}</span><span>{match.updated.replace("今天 ", "")}</span></div>
-                </button>
-              ) : (
-                <div className="kanban-placeholder">暂无需优先关注的项目</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="content-grid dashboard-bottom">
-        <Card>
-          <div className="card-head"><div><h2>最近更新的项目</h2><p>近 48 小时内有新进展</p></div><button className="text-button" onClick={goProjects}>查看全部 →</button></div>
-          <div className="recent-list">
-            {projects.slice(0, 3).map((p) => (
-              <button className="recent-row" key={p.id} onClick={() => openProject(p)}>
-                <span className="client-avatar" style={{ background: p.color }}>{p.initials}</span>
-                <span className="recent-main"><strong>{p.name}</strong><small>{p.progress}</small></span>
-                <StageBadge stage={p.stage} />
-                <span className="recent-owner">{p.owner}<small>{p.updated}</small></span>
-                <span className="chevron">›</span>
-              </button>
-            ))}
-          </div>
-        </Card>
-        <Card className="focus-card">
-          <div className="card-head"><div><h2>今日重点</h2><p>按紧急程度排序</p></div><Badge tone="red">3 项到期</Badge></div>
-          {[
-            ["10:30", "跟进 NAS-2407 样品测试", "North American Sportswear Brand", "red"],
-            ["14:00", "完成 EFC-2411 测试费说明", "European Fashion Client", "amber"],
-            ["17:00", "发送瑜伽系列规格确认表", "Emerging Yoga Wear Brand", "blue"],
-          ].map(([time, task, client, tone]) => (
-            <div className="focus-row" key={time}>
-              <span className={`focus-time time-${tone}`}>{time}</span>
-              <div><strong>{task}</strong><small>{client}</small></div>
-              <button className="round-check" aria-label="完成待办">✓</button>
-            </div>
-          ))}
-          <Button variant="secondary" className="full-button">＋ 添加待办事项</Button>
-        </Card>
-      </div>
-    </>
-  );
-}
-
 function Projects({ projects, openProject, openNew }: { projects: Project[]; openProject: (p: Project) => void; openNew: () => void }) {
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState("全部阶段");
@@ -332,10 +97,10 @@ function Projects({ projects, openProject, openNew }: { projects: Project[]; ope
             <div className="project-top">
               <span className="client-avatar large" style={{ background: p.color }}>{p.initials}</span>
               <div><span className="project-code">{p.code}</span><h3>{p.name}</h3></div>
-              <span className={`health health-${p.health}`}>{p.health}</span>
+              <HealthBadge status={p.health} className="health" showDot={false} />
             </div>
             <div className="project-client"><span>客户 / Client</span><strong>{p.customer}</strong><small>{p.region}</small></div>
-            <div className="project-tags"><StageBadge stage={p.stage} /><Badge>{p.product}</Badge></div>
+            <div className="project-tags"><StatusBadge status={p.stage} /><Badge>{p.product}</Badge></div>
             <div className="project-progress"><span>最新进展</span><p>{p.progress}</p></div>
             <div className="next-action"><span>→</span><div><small>下一步行动</small><strong>{p.next}</strong></div></div>
             <div className="project-footer"><span>负责人 · {p.owner}</span><span>{p.updated} 更新　›</span></div>
@@ -387,7 +152,7 @@ function ProjectDetail({
         <div><span>负责人 / Owner</span><strong>{project.owner}</strong></div>
         <div><span>预计数量 / Estimated Quantity</span><strong>{project.quantity}</strong></div>
         <div><span>目标交期 / Target Delivery Date</span><strong>{project.delivery}</strong></div>
-        <div><span>项目状态 / Project Health</span><strong className={`health-inline health-${project.health}`}>● {project.health}</strong></div>
+        <div><span>项目状态 / Project Health</span><HealthBadge status={project.health} className="health-inline" /></div>
       </Card>
       <div className="tabs" role="tablist">
         {tabs.map((t) => <button role="tab" aria-selected={tab === t} className={tab === t ? "active" : ""} key={t} onClick={() => setTab(t)}>{t}{t === "产品需求" && <span className="tab-alert">3</span>}</button>)}
@@ -619,7 +384,7 @@ function Reports({ showToast }: { showToast: (s: string) => void }) {
     ["下周行动计划", "取得测试反馈；完成阶梯报价；推进 Logo 与包装要求确认。"],
     ["需要管理层支持的事项", "如客户坚持 5 次水洗标准，需技术总监确认新膜材方案与价格底线。"],
   ];
-  return <><PageHeader title="周报中心" subtitle="将分散的客户进展整理为结构化销售周报。" actions={<span className="week-picker">‹　2026 年 7 月 27 日 – 8 月 2 日　›</span>} /><div className="report-toolbar card"><div><span>生成语言</span><div className="segment">{(["中文", "英文", "中英对照"] as OutputLanguage[]).map((x) => <button key={x} className={language === x ? "active" : ""} onClick={() => setLanguage(x)}>{x}</button>)}</div></div><div className="page-actions"><Button variant="secondary" onClick={() => showToast("周报内容已复制")}>复制内容</Button><Button variant="secondary" onClick={() => showToast("原型模式：已模拟导出 Markdown")}>导出 Markdown</Button><Button onClick={() => showToast(`${language}周报已重新生成`)}>✦ 重新生成</Button></div></div><div className="report-grid">{initialProjects.slice(0, 3).map((p, idx) => <Card className="report-card" key={p.id}><div className="report-card-head"><div className="detail-title"><span className="client-avatar" style={{ background: p.color }}>{p.initials}</span><div><span className="project-code">{p.code}</span><h2>{p.name}</h2><p>{p.customer}</p></div></div><StageBadge stage={p.stage} /></div><div className="report-sections">{sections.map(([title, body], sidx) => <div key={title}><strong>{title}</strong><p>{idx === 1 && sidx === 0 ? "已提交 V2 阶梯报价，并补充报价有效期说明。" : idx === 2 && sidx === 0 ? "已整理客户概念板和初步产品组合。" : body}</p></div>)}</div><div className="report-footer"><span>✦ 模拟 AI 生成 · 刚刚更新</span><div><button onClick={() => showToast("周报内容已复制")}>复制</button><button>编辑</button></div></div></Card>)}</div></>;
+  return <><PageHeader title="周报中心" subtitle="将分散的客户进展整理为结构化销售周报。" actions={<span className="week-picker">‹　2026 年 7 月 27 日 – 8 月 2 日　›</span>} /><div className="report-toolbar card"><div><span>生成语言</span><div className="segment">{(["中文", "英文", "中英对照"] as OutputLanguage[]).map((x) => <button key={x} className={language === x ? "active" : ""} onClick={() => setLanguage(x)}>{x}</button>)}</div></div><div className="page-actions"><Button variant="secondary" onClick={() => showToast("周报内容已复制")}>复制内容</Button><Button variant="secondary" onClick={() => showToast("原型模式：已模拟导出 Markdown")}>导出 Markdown</Button><Button onClick={() => showToast(`${language}周报已重新生成`)}>✦ 重新生成</Button></div></div><div className="report-grid">{initialProjects.slice(0, 3).map((p, idx) => <Card className="report-card" key={p.id}><div className="report-card-head"><div className="detail-title"><span className="client-avatar" style={{ background: p.color }}>{p.initials}</span><div><span className="project-code">{p.code}</span><h2>{p.name}</h2><p>{p.customer}</p></div></div><StatusBadge status={p.stage} /></div><div className="report-sections">{sections.map(([title, body], sidx) => <div key={title}><strong>{title}</strong><p>{idx === 1 && sidx === 0 ? "已提交 V2 阶梯报价，并补充报价有效期说明。" : idx === 2 && sidx === 0 ? "已整理客户概念板和初步产品组合。" : body}</p></div>)}</div><div className="report-footer"><span>✦ 模拟 AI 生成 · 刚刚更新</span><div><button onClick={() => showToast("周报内容已复制")}>复制</button><button>编辑</button></div></div></Card>)}</div></>;
 }
 
 function SimplePage({ type }: { type: "templates" | "settings" }) {
@@ -628,7 +393,7 @@ function SimplePage({ type }: { type: "templates" | "settings" }) {
 }
 
 function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate: (p: Project) => void }) {
-  return <Modal title="新建客户项目" onClose={onClose}><form className="modal-form" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); onCreate({ id: Date.now(), code: `NEW-${String(Date.now()).slice(-4)}`, name: String(f.get("name")), customer: String(f.get("customer")), region: String(f.get("region")), product: String(f.get("product")), stage: String(f.get("stage")) as Stage, progress: "项目已创建，等待整理初始客户询盘", owner: String(f.get("owner")), next: "梳理客户询盘并确认缺失信息", updated: "刚刚", quantity: String(f.get("quantity") || "待确认"), delivery: String(f.get("delivery") || "待确认"), health: "良好", contact: String(f.get("contact") || "待补充"), email: "待补充", initials: "NP", color: "#285c72" }); }}>
+  return <Modal title="新建客户项目" onClose={onClose}><form className="modal-form" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); const id = Date.now(); const customer = String(f.get("customer")); onCreate({ id, clientId: `client-new-${id}`, code: `NEW-${String(id).slice(-4)}`, name: String(f.get("name")), customer, region: String(f.get("region")), product: String(f.get("product")), stage: String(f.get("stage")) as Stage, lifecycleStage: "inquiry", progress: "项目已创建，等待整理初始客户询盘", owner: String(f.get("owner")), next: "梳理客户询盘并确认缺失信息", updated: "刚刚", lastUpdatedAt: new Date(id).toISOString(), quantity: String(f.get("quantity") || "待确认"), delivery: String(f.get("delivery") || "待确认"), health: "良好", contact: String(f.get("contact") || "待补充"), email: "待补充", initials: "NP", color: "#285c72", currentSummary: "新项目已创建，当前处于询盘整理阶段。", confirmedInformation: [customer], pendingInformation: ["客户需求与产品规格待整理"], risks: [], nextActions: ["梳理客户询盘并确认缺失信息"] }); }}>
     <div className="form-row"><label>项目名称 / Project Name<input name="name" required placeholder="例如：户外品牌——防水拉链项目" /></label><label>客户名称或代号 / Client Name or Code<input name="customer" required placeholder="请使用匿名或虚构名称" /></label></div>
     <div className="form-row"><label>国家或地区 / Country or Region<input name="region" required placeholder="例如：加拿大 · 温哥华" /></label><label>联系人 / Contact<input name="contact" placeholder="姓名与职位" /></label></div>
     <div className="form-row"><label>产品类型 / Product Type<select name="product"><option>防水尼龙拉链</option><option>金属拉链</option><option>金属纽扣</option><option>树脂纽扣</option><option>绳扣与织带</option><option>其他服装辅料</option></select></label><label>当前销售阶段 / Sales Stage<select name="stage">{stages.map((s) => <option key={s}>{s}</option>)}</select></label></div>
@@ -642,7 +407,7 @@ export default function Home() {
   const [view, setView] = useState<View>("dashboard");
   const [projects, setProjects] = useState(initialProjects);
   const [activeProject, setActiveProject] = useState<Project>(initialProjects[0]);
-  const [language, setLanguage] = useState<"中文" | "English">("中文");
+  const [language, setLanguage] = useState<InterfaceLanguage>("中文");
   const [newProject, setNewProject] = useState(false);
   const [toast, setToast] = useState("");
   const showToast = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(""), 2500); };
@@ -652,31 +417,46 @@ export default function Home() {
     setProjects((all) => all.map((p) => p.id === activeProject.id ? { ...p, stage } : p));
     showToast(`项目阶段已更新为“${stage}”`);
   };
-  const activeNav = view === "detail" ? "projects" : view;
-  const title = useMemo(() => nav.find((n) => n.id === activeNav)?.label || "工作台", [activeNav]);
+  const activeNav: WorkspaceView = view === "detail" ? "projects" : view;
+  const title = useMemo(() => workspaceNavigation.find((item) => item.id === activeNav)?.label || "工作台", [activeNav]);
+  const isPlaceholder = view !== "detail" && placeholderViews.has(view);
+  const changeLanguage = (nextLanguage: InterfaceLanguage) => {
+    setLanguage(nextLanguage);
+    showToast(nextLanguage === "中文" ? "界面语言已切换为中文" : "Language switched to English");
+  };
+  const handleGlobalCreate = (type: GlobalCreateType) => {
+    if (type === "project") {
+      setNewProject(true);
+      return;
+    }
+    if (type === "sample") setView("samples");
+    if (type === "quotation") setView("quotations");
+    if (type === "task") setView("todos");
+    const labels: Record<Exclude<GlobalCreateType, "project">, string> = { sample: "样品", quotation: "报价", task: "待办" };
+    showToast(`${labels[type]}新建入口已打开；完整流程将在后续步骤实现`);
+  };
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <button className="brand" onClick={() => setView("dashboard")}><span className="brand-mark">T</span><span><strong>TrimFlow AI</strong><small>服装辅料外贸销售助手</small></span></button>
-        <div className="workspace-select"><span className="client-avatar small-avatar">TF</span><div><strong>TrimFlow 外贸团队</strong><small>销售工作区</small></div><span>⌄</span></div>
-        <nav>{nav.slice(0, 5).map((item) => <button key={item.id} className={activeNav === item.id ? "active" : ""} onClick={() => setView(item.id)}><span className="nav-icon">{item.icon}</span><span>{language === "中文" ? item.label : item.en}</span>{item.id === "todos" && <b>9</b>}</button>)}</nav>
-        <div className="sidebar-spacer" />
-        <nav className="bottom-nav">{nav.slice(5).map((item) => <button key={item.id} className={activeNav === item.id ? "active" : ""} onClick={() => setView(item.id)}><span className="nav-icon">{item.icon}</span><span>{language === "中文" ? item.label : item.en}</span></button>)}</nav>
-        <div className="user-card"><span className="user-avatar">陈</span><div><strong>陈晨</strong><small>外贸销售经理</small></div><button>⋯</button></div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar"><div className="mobile-brand"><span className="brand-mark">T</span><strong>TrimFlow AI</strong></div><div className="breadcrumb"><span>销售工作区</span><b>/</b><strong>{title}</strong></div><div className="top-actions"><label className="global-search"><span>⌕</span><input placeholder="搜索项目、客户或记录..." /></label><button className="notification">♧<span /></button><div className="language-switch"><button className={language === "中文" ? "active" : ""} onClick={() => { setLanguage("中文"); showToast("界面语言已切换为中文"); }}>中文</button><button className={language === "English" ? "active" : ""} onClick={() => { setLanguage("English"); showToast("Language switched to English"); }}>English</button></div></div></header>
-        <main>
-          {view === "dashboard" && <Dashboard projects={projects} openProject={openProject} goProjects={() => setView("projects")} openNew={() => setNewProject(true)} />}
+    <>
+      <WorkspaceShell
+        activeView={activeNav}
+        currentTitle={title}
+        language={language}
+        todoCount={mockTasks.filter((task) => task.status !== "已完成").length}
+        onNavigate={setView}
+        onLanguageChange={changeLanguage}
+        onGlobalCreate={handleGlobalCreate}
+      >
+          {view === "dashboard" && <DashboardView projects={projects} onOpenProject={openProject} onNavigate={setView} onOpenNewProject={() => setNewProject(true)} />}
           {view === "projects" && <Projects projects={projects} openProject={openProject} openNew={() => setNewProject(true)} />}
           {view === "detail" && <ProjectDetail project={activeProject} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} />}
           {view === "todos" && <Todos showToast={showToast} />}
           {view === "reports" && <Reports showToast={showToast} />}
+          {view === "ai" && <><PageHeader title="AI 助手" subtitle={`当前关联项目：${activeProject.code} · ${activeProject.name}`} /><AIAssistant project={activeProject} showToast={showToast} /></>}
           {(view === "templates" || view === "settings") && <SimplePage type={view} />}
-        </main>
-      </div>
+          {isPlaceholder && <EmptyState title={title} description="该模块将在 TrimFlow AI 2.0 第一阶段后续步骤中完成。" />}
+      </WorkspaceShell>
       {newProject && <NewProjectModal onClose={() => setNewProject(false)} onCreate={(p) => { setProjects((x) => [p, ...x]); setNewProject(false); showToast("新项目已创建"); openProject(p); }} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
-    </div>
+    </>
   );
 }

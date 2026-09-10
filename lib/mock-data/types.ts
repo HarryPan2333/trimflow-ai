@@ -51,6 +51,24 @@ export type Contact = {
   email: string;
   phone?: string;
   isPrimary: boolean;
+  department?:
+    | "Sourcing"
+    | "Material Development"
+    | "Trim Development"
+    | "Design"
+    | "Production"
+    | "Sustainability"
+    | "Management";
+  decisionRole?:
+    | "Decision Maker"
+    | "Influencer"
+    | "Technical Approver"
+    | "Buyer"
+    | "User"
+    | "Gatekeeper";
+  influenceLevel?: "High" | "Medium" | "Low";
+  relationshipStrength?: "Strong" | "Developing" | "Weak" | "Unknown";
+  lastContactAt?: string;
 };
 
 export type Client = {

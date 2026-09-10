@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { EmptyState } from "../components/business/empty-state";
 import { HealthBadge } from "../components/business/health-badge";
 import { StatusBadge } from "../components/business/status-badge";
@@ -9,10 +9,9 @@ import { PageHeader } from "../components/layout/page-header";
 import { WorkspaceShell, workspaceNavigation } from "../components/layout/workspace-shell";
 import type { InterfaceLanguage, WorkspaceView } from "../components/layout/workspace-shell";
 import type { GlobalCreateType } from "../components/layout/workspace-shell";
+import { ProjectCommandCenter } from "../components/projects/project-command-center";
 import { Badge, Button, Card, Modal } from "../components/ui/primitives";
 import {
-  legacyActivityRows as activities,
-  legacyRequirementRows as requirements,
   projects as initialProjects,
   projectStages as stages,
   tasks as mockTasks,
@@ -123,153 +122,17 @@ function ProjectDetail({
   updateStage: (stage: Stage) => void;
   showToast: (s: string) => void;
 }) {
-  const [tab, setTab] = useState("项目概览");
-  const [recordModal, setRecordModal] = useState(false);
-  const [todoModal, setTodoModal] = useState(false);
-  const [records, setRecords] = useState(activities);
-  const tabs = ["项目概览", "客户资料", "产品需求", "沟通记录", "样品与报价", "AI助手"];
-  const addRecord = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setRecords([{ date: "刚刚", title: String(fd.get("type")), text: String(fd.get("content")), icon: "＋" }, ...records]);
-    setRecordModal(false); showToast("沟通记录已添加");
-  };
   return (
-    <>
-      <button className="back-link" onClick={onBack}>‹ 返回客户项目</button>
-      <div className="detail-head">
-        <div className="detail-title">
-          <span className="client-avatar xl" style={{ background: project.color }}>{project.initials}</span>
-          <div><span className="project-code">{project.code}</span><h1>{project.name}</h1><p>{project.customer} · {project.region}</p></div>
-        </div>
-        <div className="page-actions"><Button variant="secondary" onClick={() => setTodoModal(true)}>＋ 添加待办</Button><Button onClick={() => setTab("AI助手")}>✦ 询问项目 AI</Button></div>
-      </div>
-      <Card className="project-facts">
-        <div><span>产品类型 / Product Type</span><strong>{project.product}</strong></div>
-        <div><span>销售阶段 / Sales Stage</span>
-          <select value={project.stage} onChange={(e) => updateStage(e.target.value as Stage)}>{stages.map((s) => <option key={s}>{s}</option>)}</select>
-        </div>
-        <div><span>负责人 / Owner</span><strong>{project.owner}</strong></div>
-        <div><span>预计数量 / Estimated Quantity</span><strong>{project.quantity}</strong></div>
-        <div><span>目标交期 / Target Delivery Date</span><strong>{project.delivery}</strong></div>
-        <div><span>项目状态 / Project Health</span><HealthBadge status={project.health} className="health-inline" /></div>
-      </Card>
-      <div className="tabs" role="tablist">
-        {tabs.map((t) => <button role="tab" aria-selected={tab === t} className={tab === t ? "active" : ""} key={t} onClick={() => setTab(t)}>{t}{t === "产品需求" && <span className="tab-alert">3</span>}</button>)}
-      </div>
-      {tab === "项目概览" && <Overview records={records} />}
-      {tab === "客户资料" && <CustomerInfo project={project} />}
-      {tab === "产品需求" && <Requirements />}
-      {tab === "沟通记录" && <Communications records={records} add={() => setRecordModal(true)} />}
-      {tab === "样品与报价" && <SamplesQuotes />}
-      {tab === "AI助手" && <AIAssistant project={project} showToast={showToast} />}
-      {recordModal && (
-        <Modal title="添加沟通记录" onClose={() => setRecordModal(false)}>
-          <form className="modal-form" onSubmit={addRecord}>
-            <label>记录类型<select name="type"><option>客户邮件</option><option>聊天记录</option><option>电话记录</option><option>内部备注</option><option>样品反馈</option><option>报价反馈</option></select></label>
-            <label>日期与时间<input type="datetime-local" defaultValue="2026-07-28T14:30" /></label>
-            <label>记录内容<textarea name="content" required placeholder="粘贴邮件、聊天内容或输入内部备注..." rows={6} /></label>
-            <div className="modal-actions"><Button type="button" variant="ghost" onClick={() => setRecordModal(false)}>取消</Button><Button type="submit">保存记录</Button></div>
-          </form>
-        </Modal>
-      )}
-      {todoModal && (
-        <Modal title="添加项目待办" onClose={() => setTodoModal(false)}>
-          <form className="modal-form" onSubmit={(e) => { e.preventDefault(); setTodoModal(false); showToast("待办事项已创建"); }}>
-            <label>待办事项<input required defaultValue="跟进客户 V2 样品测试反馈" /></label>
-            <div className="form-row"><label>负责人<select><option>陈晨</option><option>王璐</option><option>林薇</option></select></label><label>截止日期<input type="date" defaultValue="2026-07-30" /></label></div>
-            <label>优先级<select><option>P1 · 紧急</option><option>P2 · 重要</option><option>P3 · 常规</option></select></label>
-            <div className="modal-actions"><Button type="button" variant="ghost" onClick={() => setTodoModal(false)}>取消</Button><Button type="submit">创建待办</Button></div>
-          </form>
-        </Modal>
-      )}
-    </>
+    <ProjectCommandCenter
+      key={project.id}
+      project={project}
+      stages={stages}
+      onBack={onBack}
+      onUpdateStage={updateStage}
+      showToast={showToast}
+      aiCopilot={<AIAssistant project={project} showToast={showToast} />}
+    />
   );
-}
-
-function Overview({ records }: { records: typeof activities }) {
-  return (
-    <div className="detail-layout">
-      <div className="main-column">
-        <Card className="ai-summary">
-          <div className="card-head"><div className="title-with-icon"><span className="sparkle">✦</span><div><h2>AI 项目摘要</h2><p>根据当前项目的模拟资料整理</p></div></div><Badge tone="blue">刚刚更新</Badge></div>
-          <p className="summary-lead">项目处于<strong>打样阶段</strong>。第二版防水拉链样品已于今日签收，客户将优先测试 64 cm 黑色款。多数规格已经确认，但测试标准和目标价格仍需尽快对齐。</p>
-          <div className="summary-stats">
-            <div><span>当前进展</span><strong>V2 样品已签收</strong><small>等待客户测试</small></div>
-            <div><span>信息完整度</span><strong>8 / 11 项</strong><small>73% 已确认</small></div>
-            <div><span>下一关键节点</span><strong>初步测试反馈</strong><small>预计 7 月 30 日</small></div>
-          </div>
-        </Card>
-        <div className="two-cols">
-          <Card className="list-card good-list"><div className="card-head"><h2><span>✓</span> 已确认信息</h2><Badge tone="green">8 项</Badge></div>
-            {["#5 TPU 膜防水尼龙拉链", "Black C 与 Cool Gray 11 C", "长度 58 / 64 / 72 cm", "预计年用量 120,000 条"].map((x) => <div className="check-line" key={x}><span>✓</span>{x}</div>)}
-          </Card>
-          <Card className="list-card pending-list"><div className="card-head"><h2><span>!</span> 待确认信息</h2><Badge tone="amber">3 项</Badge></div>
-            {["拉片定制 Logo 最终图稿", "可接受的目标价格区间", "3 次或 5 次水洗测试标准"].map((x) => <div className="check-line" key={x}><span>?</span>{x}</div>)}
-          </Card>
-        </div>
-        <Card>
-          <div className="card-head"><div><h2>最近活动</h2><p>邮件、样品与内部协作记录</p></div><button className="text-button">查看全部记录</button></div>
-          <Timeline records={records} />
-        </Card>
-      </div>
-      <aside className="side-column">
-        <Card className="risk-card"><div className="card-head"><h2>风险提示</h2><Badge tone="amber">2 项</Badge></div>
-          <div className="risk-item"><span>!</span><div><strong>测试标准存在冲突</strong><p>客户要求 5 次水洗，技术部建议按 3 次，可能造成重新打样。</p><small>中风险 · 建议本周确认</small></div></div>
-          <div className="risk-item"><span>¥</span><div><strong>目标价格尚未确认</strong><p>建议在测试通过前提供初步价格区间，避免后期出现较大价差。</p><small>中风险 · 报价前处理</small></div></div>
-        </Card>
-        <Card className="actions-card"><div className="card-head"><h2>下一步行动</h2><span className="muted">4 项</span></div>
-          {[
-            ["P1", "跟进客户测试安排", "7 月 30 日 · 陈晨"],
-            ["P1", "确认水洗后测试标准", "7 月 30 日 · 技术部"],
-            ["P2", "索取 Logo 矢量图", "8 月 1 日 · 陈晨"],
-            ["P2", "准备三档阶梯报价", "8 月 2 日 · 报价组"],
-          ].map(([p, t, meta]) => <div className="action-row" key={t}><span className={p === "P1" ? "priority p1" : "priority"}>{p}</span><div><strong>{t}</strong><small>{meta}</small></div><button>○</button></div>)}
-          <Button variant="secondary" className="full-button">＋ 添加行动</Button>
-        </Card>
-        <Card className="contact-mini"><h2>客户联系人</h2><div className="contact-person"><span className="client-avatar">OR</span><div><strong>Olivia Reed</strong><small>Product Developer</small></div></div><p>olivia.reed@example-client.com</p><p>偏好：简洁、数据导向的英文邮件</p><Button variant="secondary" className="full-button">查看客户资料</Button></Card>
-      </aside>
-    </div>
-  );
-}
-
-function Timeline({ records }: { records: typeof activities }) {
-  return <div className="timeline">{records.map((a, i) => <div className="timeline-item" key={`${a.title}-${i}`}><span className="timeline-icon">{a.icon}</span><div><span>{a.date}</span><strong>{a.title}</strong><p>{a.text}</p></div></div>)}</div>;
-}
-
-function CustomerInfo({ project }: { project: Project }) {
-  const groups = [
-    ["客户基本信息", [["客户名称 / Client Name", project.customer], ["国家或地区 / Country or Region", project.region], ["客户类型 / Client Type", "中型运动服装品牌 / Mid-sized activewear brand"], ["合作状态 / Relationship", "新客户 · 开发阶段"], ["常用币种 / Currency", "USD"]]],
-    ["主要联系人", [["姓名 / Name", project.contact], ["邮箱 / Email", project.email], ["时区 / Time Zone", "Pacific Time (UTC−8)"], ["沟通渠道 / Channel", "Email · WhatsApp"]]],
-    ["客户偏好与沟通规则", [["产品偏好 / Preference", "可持续材料、哑光外观、轻量化"], ["邮件语气 / Email Tone", "简洁、专业、数据导向"], ["回复习惯 / Response Pattern", "通常 1–2 个工作日回复"], ["注意事项 / Notes", "报价需明确测试费、模具费及有效期"]]],
-  ];
-  return <div className="info-grid">{groups.map(([title, rows]) => <Card key={title as string}><div className="card-head"><h2>{title as string}</h2><Button variant="ghost">编辑</Button></div><div className="info-list">{(rows as string[][]).map(([k, v]) => <div key={k}><span>{k}</span><strong>{v}</strong></div>)}</div></Card>)}</div>;
-}
-
-function Requirements() {
-  return (
-    <Card className="table-card">
-      <div className="card-head"><div><h2>结构化产品需求</h2><p>最后更新：今天 09:45 · 由陈晨整理</p></div><div className="page-actions"><Button variant="secondary">导入规格表</Button><Button>＋ 添加规格项</Button></div></div>
-      <div className="requirement-progress"><div><span>信息完整度</span><strong>73%</strong></div><div className="progress-track"><span style={{ width: "73%" }} /></div><small>8 项已确认 · 2 项待确认 · 1 项有冲突</small></div>
-      <div className="table-wrap"><table><colgroup><col className="field-column" /><col className="value-column" /><col className="status-column" /><col className="action-column" /></colgroup><thead><tr><th>业务字段 / Business Field</th><th>当前值 / Current Value</th><th>状态 / Status</th><th>操作 / Action</th></tr></thead><tbody>
-        {requirements.map(([field, value, status]) => <tr key={field}><td><strong>{field}</strong></td><td>{value}</td><td><Badge tone={status === "已确认" ? "green" : status === "有冲突" ? "red" : "amber"}>{status}</Badge></td><td><button className="text-button">编辑</button></td></tr>)}
-      </tbody></table></div>
-    </Card>
-  );
-}
-
-function Communications({ records, add }: { records: typeof activities; add: () => void }) {
-  const expanded = [
-    { type: "客户邮件", date: "今天 09:18", author: "Olivia Reed", body: "Hi Chen,\n\nWe have received the V2 samples. Our team will begin by testing the black 64 cm zipper. Could you please confirm whether the specified water-repellency rating can be maintained after five wash cycles?\n\nBest regards,\nOlivia", tone: "blue" },
-    { type: "WhatsApp 聊天", date: "7 月 27 日 16:08", author: "Olivia ↔ 陈晨", body: "Olivia: The samples look good. We will share our initial test results by Thursday.\nChen: Thank you. Our technical team is ready to support you if any questions arise.", tone: "green" },
-    { type: "内部备注", date: "7 月 26 日 11:32", author: "技术部 · 刘工", body: "现有配方可稳定达到水洗 3 次后防泼水等级不低于 80 分。若改为水洗 5 次，需调整膜材，预计增加 3%–5% 的成本。建议尽快与客户书面确认测试标准。", tone: "amber" },
-  ];
-  return <><div className="section-title"><div><h2>沟通记录</h2><p>按时间汇总客户往来与内部协作</p></div><Button onClick={add}>＋ 添加记录</Button></div><div className="communication-list">{expanded.map((x) => <Card className="comm-card" key={x.date}><div className="comm-icon">{x.type === "客户邮件" ? "✉" : x.type.includes("WhatsApp") ? "W" : "▣"}</div><div className="comm-body"><div><Badge tone={x.tone}>{x.type}</Badge><span>{x.date}</span></div><strong>{x.author}</strong><p>{x.body}</p><div className="comm-actions"><button>回复草稿</button><button>转为待办</button><button>编辑备注</button></div></div></Card>)}<Card><div className="card-head"><h2>更多项目记录</h2><Badge>{records.length} 条</Badge></div><Timeline records={records} /></Card></div></>;
-}
-
-function SamplesQuotes() {
-  return <div className="samples-layout"><Card><div className="card-head"><div><h2>样品管理</h2><p>样品版本与反馈状态</p></div><Button>＋ 新建样品版本</Button></div><div className="version-card active-version"><div className="version-title"><span>V2</span><div><strong>防水拉链功能样</strong><small>当前版本</small></div><Badge tone="purple">客户测试中</Badge></div><div className="version-grid"><div><span>寄出日期 / Ship Date</span><strong>2026-07-24</strong></div><div><span>签收日期 / Delivery Date</span><strong>2026-07-28</strong></div><div><span>样品数量 / Sample Quantity</span><strong>12 条</strong></div><div><span>快递 / Courier</span><strong>DHL · 模拟单号</strong></div></div><div className="feedback-box"><span>客户反馈 / Client Feedback</span><p>样品已签收。客户将优先测试 64 cm 黑色款，预计周四提供初步反馈。</p></div></div><div className="version-card"><div className="version-title"><span>V1</span><div><strong>外观与颜色样</strong><small>2026-07-08 寄出</small></div><Badge tone="neutral">已完成</Badge></div><p className="version-note">客户反馈：膜面光泽偏高，灰色略偏冷；相关问题已在 V2 中调整。</p></div></Card>
-    <Card><div className="card-head"><div><h2>报价记录</h2><p>所有金额均为模拟数据</p></div><Button>＋ 新建报价</Button></div><div className="quote-card current"><div className="quote-head"><span>Q-V2</span><Badge tone="cyan">内部准备中</Badge></div><strong className="quote-price">USD 0.88 <small>/ 条</small></strong><div className="quote-grid"><div><span>数量 / Quantity</span><strong>120,000</strong></div><div><span>币种 / Currency</span><strong>USD</strong></div><div><span>贸易条款 / Incoterm</span><strong>FOB Ningbo</strong></div><div><span>有效期 / Validity</span><strong>30 天</strong></div></div><div className="feedback-box amber-box"><span>内部建议</span><p>按 80K / 120K / 200K 准备三档阶梯报价；水洗 5 次版本需另计材料成本。</p></div><Button className="full-button">预览报价</Button></div><div className="quote-card"><div className="quote-head"><span>Q-V1 · 2026-07-12</span><Badge>参考报价</Badge></div><strong className="quote-price small">USD 0.91 <small>/ 条</small></strong><p className="version-note">客户尚未正式反馈价格，目前先推进功能样测试。</p></div></Card></div>;
 }
 
 type AssistantAnswer = {

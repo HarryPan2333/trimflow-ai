@@ -34,7 +34,13 @@ const caseA: BusinessCase = {
       title: "Product Developer",
       email: "olivia.reed@example-client.com",
       isPrimary: true,
+      department: "Material Development",
+      decisionRole: "Technical Approver",
+      influenceLevel: "High",
+      relationshipStrength: "Strong",
+      lastContactAt: "2026-08-01T16:20:00Z",
     },
+    { id: "contact-nas-ethan", clientId: "client-nas", name: "Ethan Cole", title: "Sourcing Manager", email: "ethan.cole@example-client.com", isPrimary: false, department: "Sourcing", decisionRole: "Buyer", influenceLevel: "Medium", relationshipStrength: "Developing", lastContactAt: "2026-07-30T13:20:00Z" },
   ],
   project: {
     id: 1,
@@ -176,7 +182,9 @@ const caseB: BusinessCase = {
     preferences: ["古铜色表面", "REACH 合规", "报价费用拆分", "邮件确认关键节点"],
   },
   contacts: [
-    { id: "contact-efc-camille", clientId: "client-efc", name: "Camille Bernard", title: "Buyer", email: "camille.bernard@example-client.com", isPrimary: true },
+    { id: "contact-efc-camille", clientId: "client-efc", name: "Camille Bernard", title: "Buyer", email: "camille.bernard@example-client.com", isPrimary: true, department: "Sourcing", decisionRole: "Buyer", influenceLevel: "High", relationshipStrength: "Strong", lastContactAt: "2026-08-05T09:40:00Z" },
+    { id: "contact-efc-sophie", clientId: "client-efc", name: "Sophie Laurent", title: "Head of Sourcing", email: "sophie.laurent@example-client.com", isPrimary: false, department: "Management", decisionRole: "Decision Maker", influenceLevel: "High", relationshipStrength: "Developing", lastContactAt: "2026-07-24T10:15:00Z" },
+    { id: "contact-efc-marcel", clientId: "client-efc", name: "Marcel Durand", title: "Production Coordinator", email: "marcel.durand@example-client.com", isPrimary: false, department: "Production", decisionRole: "User", influenceLevel: "Medium", relationshipStrength: "Developing", lastContactAt: "2026-08-02T12:10:00Z" },
   ],
   project: {
     id: 2,
@@ -293,7 +301,8 @@ const caseC: BusinessCase = {
     preferences: ["低饱和度颜色", "轻量辅料", "环保材料", "按系列集中评审"],
   },
   contacts: [
-    { id: "contact-eyw-mia", clientId: "client-eyw", name: "Mia Collins", title: "Founder", email: "mia.collins@example-client.com", isPrimary: true },
+    { id: "contact-eyw-mia", clientId: "client-eyw", name: "Mia Collins", title: "Founder", email: "mia.collins@example-client.com", isPrimary: true, department: "Management", decisionRole: "Decision Maker", influenceLevel: "High", relationshipStrength: "Developing", lastContactAt: "2026-07-29T07:10:00Z" },
+    { id: "contact-eyw-noah", clientId: "client-eyw", name: "Noah Kim", title: "Material Developer", email: "noah.kim@example-client.com", isPrimary: false, department: "Material Development", decisionRole: "Technical Approver", influenceLevel: "Medium", relationshipStrength: "Developing", lastContactAt: "2026-07-26T09:25:00Z" },
   ],
   project: {
     id: 3,

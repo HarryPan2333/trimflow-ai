@@ -1,4 +1,5 @@
 import type { BusinessCase, ProjectStage } from "./types";
+import { withSampleDevelopment } from "./sample-development";
 
 export const projectStages: ProjectStage[] = [
   "新询盘",
@@ -389,4 +390,4 @@ const caseC: BusinessCase = {
   ],
 };
 
-export const businessCases: BusinessCase[] = [caseA, caseB, caseC];
+export const businessCases: BusinessCase[] = withSampleDevelopment([caseA, caseB, caseC]);

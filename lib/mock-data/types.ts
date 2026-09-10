@@ -141,6 +141,41 @@ export type Sample = {
   feedbackStatus: string;
   nextAction: string;
   specs: Record<string, string>;
+  sampleType?: "Initial Sample" | "Development Sample" | "Sales Sample" | "Bulk Approval Sample";
+  owner?: string;
+  targetDate?: string;
+  logistics?: {
+    versionId: string;
+    courier?: string;
+    trackingNumber?: string;
+    expectedArrival?: string;
+    receivedDate?: string;
+    destination?: string;
+    receiver?: string;
+  };
+  developmentCost?: {
+    currency: "USD" | "EUR" | "CNY";
+    sampleFee?: number;
+    mouldFee?: number;
+    courierFee?: number;
+    testingFee?: number;
+    other?: number;
+  };
+  designIn?: {
+    customerIdea: string;
+    application: string;
+    reference: string;
+    suggestedProduct: string;
+    suggestedMaterial: string;
+    suggestedProcess: string;
+    notes: string;
+    potential: string;
+  };
+};
+
+export type SampleSpecification = {
+  value: string;
+  status: "Confirmed" | "Pending" | "Not Required";
 };
 
 export type SampleVersion = {
@@ -153,6 +188,11 @@ export type SampleVersion = {
   status: SampleStatus;
   summary: string;
   changes: string[];
+  specifications?: Record<string, SampleSpecification>;
+  reasonForChange?: string;
+  internalNote?: string;
+  revisionFeedbackIds?: string[];
+  reviewOutcome?: "Approved" | "Rejected";
 };
 
 export type SampleFeedback = {
@@ -166,6 +206,11 @@ export type SampleFeedback = {
   summary: string;
   details: string;
   requiresRevision: boolean;
+  category?: "Color" | "Size" | "Material" | "Logo" | "Function" | "Testing" | "Quality" | "Design" | "Cost" | "Other";
+  severity?: "Blocking" | "Important" | "Minor";
+  requiredAction?: string;
+  resolution?: "Open" | "Resolved";
+  resolvedInVersionId?: string;
 };
 
 export type Quotation = {

@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import "../components/samples/sample-workspace.css";
+
+import { useMemo, useReducer, useState } from "react";
 import { EmptyState } from "../components/business/empty-state";
 import { HealthBadge } from "../components/business/health-badge";
 import { StatusBadge } from "../components/business/status-badge";
@@ -10,18 +12,23 @@ import { WorkspaceShell, workspaceNavigation } from "../components/layout/worksp
 import type { InterfaceLanguage, WorkspaceView } from "../components/layout/workspace-shell";
 import type { GlobalCreateType } from "../components/layout/workspace-shell";
 import { ProjectCommandCenter } from "../components/projects/project-command-center";
+import { SampleCenter } from "../components/samples/sample-center";
+import { SampleDetail } from "../components/samples/sample-detail";
+import { createSampleWorkspace, getSampleContext, sampleWorkspaceReducer } from "../components/samples/sample-data";
+import type { SampleWorkspace } from "../components/samples/sample-data";
 import { Badge, Button, Card, Modal } from "../components/ui/primitives";
 import {
   projects as initialProjects,
+  clients,
   projectStages as stages,
   tasks as mockTasks,
 } from "../lib/mock-data";
 import type { Project, ProjectStage as Stage } from "../lib/mock-data";
 
 type OutputLanguage = "中文" | "英文" | "中英对照";
-type View = WorkspaceView | "detail";
+type View = WorkspaceView | "detail" | "sample-detail";
 
-const placeholderViews = new Set<WorkspaceView>(["clients", "samples", "quotations", "orders", "fulfillment"]);
+const placeholderViews = new Set<WorkspaceView>(["clients", "quotations", "orders", "fulfillment"]);
 
 const aiPrompts = ["总结当前项目", "还有哪些信息待确认？", "生成下一步行动", "生成客户英文回复", "生成内部中文任务单", "生成项目周报", "准备价格谈判方案", "当前项目有哪些风险？"];
 
@@ -116,11 +123,19 @@ function ProjectDetail({
   onBack,
   updateStage,
   showToast,
+  sampleWorkspace,
+  onOpenSample,
+  language,
+  initialTab,
 }: {
   project: Project;
   onBack: () => void;
   updateStage: (stage: Stage) => void;
   showToast: (s: string) => void;
+  sampleWorkspace: SampleWorkspace;
+  onOpenSample: (id: string) => void;
+  language: InterfaceLanguage;
+  initialTab: "overview" | "samples";
 }) {
   return (
     <ProjectCommandCenter
@@ -130,6 +145,10 @@ function ProjectDetail({
       onBack={onBack}
       onUpdateStage={updateStage}
       showToast={showToast}
+      sampleWorkspace={sampleWorkspace}
+      onOpenSample={onOpenSample}
+      language={language}
+      initialTab={initialTab}
       aiCopilot={<AIAssistant project={project} showToast={showToast} />}
     />
   );
@@ -270,19 +289,26 @@ export default function Home() {
   const [view, setView] = useState<View>("dashboard");
   const [projects, setProjects] = useState(initialProjects);
   const [activeProject, setActiveProject] = useState<Project>(initialProjects[0]);
+  const [sampleWorkspace, dispatchSample] = useReducer(sampleWorkspaceReducer, undefined, createSampleWorkspace);
+  const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
+  const [sampleClientId, setSampleClientId] = useState<string | null>(null);
+  const [projectTab, setProjectTab] = useState<"overview" | "samples">("overview");
   const [language, setLanguage] = useState<InterfaceLanguage>("中文");
   const [newProject, setNewProject] = useState(false);
   const [toast, setToast] = useState("");
   const showToast = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(""), 2500); };
-  const openProject = (p: Project) => { setActiveProject(p); setView("detail"); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const openProject = (p: Project, initialTab: "overview" | "samples" = "overview") => { setProjectTab(initialTab); setActiveProject(p); setView("detail"); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const openSample = (id: string) => { setActiveSampleId(id); setView("sample-detail"); window.scrollTo({ top: 0 }); };
+  const activeSample = sampleWorkspace.samples.find((sample) => sample.id === activeSampleId);
+  const sampleClient = clients.find((client) => client.id === sampleClientId);
   const updateStage = (stage: Stage) => {
     setActiveProject((p) => ({ ...p, stage }));
     setProjects((all) => all.map((p) => p.id === activeProject.id ? { ...p, stage } : p));
     showToast(`项目阶段已更新为“${stage}”`);
   };
-  const activeNav: WorkspaceView = view === "detail" ? "projects" : view;
+  const activeNav: WorkspaceView = view === "detail" ? "projects" : view === "sample-detail" ? "samples" : view;
   const title = useMemo(() => workspaceNavigation.find((item) => item.id === activeNav)?.label || "工作台", [activeNav]);
-  const isPlaceholder = view !== "detail" && placeholderViews.has(view);
+  const isPlaceholder = view !== "detail" && view !== "sample-detail" && placeholderViews.has(view) && !(view === "clients" && sampleClient);
   const changeLanguage = (nextLanguage: InterfaceLanguage) => {
     setLanguage(nextLanguage);
     showToast(nextLanguage === "中文" ? "界面语言已切换为中文" : "Language switched to English");
@@ -292,10 +318,14 @@ export default function Home() {
       setNewProject(true);
       return;
     }
-    if (type === "sample") setView("samples");
+    if (type === "sample") {
+      setView("samples");
+      showToast("样品开发中心已打开；选择样品可发起后续版本开发");
+      return;
+    }
     if (type === "quotation") setView("quotations");
     if (type === "task") setView("todos");
-    const labels: Record<Exclude<GlobalCreateType, "project">, string> = { sample: "样品", quotation: "报价", task: "待办" };
+    const labels: Record<"quotation" | "task", string> = { quotation: "报价", task: "待办" };
     showToast(`${labels[type]}新建入口已打开；完整流程将在后续步骤实现`);
   };
   return (
@@ -311,7 +341,10 @@ export default function Home() {
       >
           {view === "dashboard" && <DashboardView projects={projects} onOpenProject={openProject} onNavigate={setView} onOpenNewProject={() => setNewProject(true)} />}
           {view === "projects" && <Projects projects={projects} openProject={openProject} openNew={() => setNewProject(true)} />}
-          {view === "detail" && <ProjectDetail project={activeProject} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} />}
+          {view === "detail" && <ProjectDetail project={activeProject} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} onOpenSample={openSample} language={language} initialTab={projectTab} />}
+          {view === "samples" && <SampleCenter workspace={sampleWorkspace} projects={projects} onOpenSample={openSample} language={language} />}
+          {view === "sample-detail" && activeSample && <SampleDetail key={activeSample.id} context={getSampleContext(activeSample, sampleWorkspace, projects)} language={language} dispatch={dispatchSample} onBack={() => setView("samples")} onProject={() => { const p = projects.find((project) => project.id === activeSample.projectId); if (p) openProject(p, "samples"); }} onClient={() => { setSampleClientId(activeSample.clientId); setView("clients"); window.scrollTo({ top: 0 }); }} showToast={showToast} />}
+          {view === "clients" && sampleClient && <div className="sample-workspace"><button className="back-link" onClick={() => activeSampleId ? openSample(activeSampleId) : setView("samples")}>‹ 返回样品 / Back to Sample</button><PageHeader title={sampleClient.name} subtitle={`${sampleClient.code} · ${sampleClient.country} · ${sampleClient.region}`} /><Card className="sample-section"><div className="sample-section-head"><h2>客户关联 / Client Reference</h2><Badge>{sampleClient.type}</Badge></div><p className="sample-resource-note">这是样品关联的客户资料预览；完整客户中心将在后续阶段完成。</p><div className="sample-client-projects">{projects.filter((project) => project.clientId === sampleClient.id).map((project) => <button key={project.id} onClick={() => openProject(project, "samples")}><strong>{project.code} · {project.name}</strong><span>查看项目与样品 →</span></button>)}</div></Card></div>}
           {view === "todos" && <Todos showToast={showToast} />}
           {view === "reports" && <Reports showToast={showToast} />}
           {view === "ai" && <><PageHeader title="AI 助手" subtitle={`当前关联项目：${activeProject.code} · ${activeProject.name}`} /><AIAssistant project={activeProject} showToast={showToast} /></>}

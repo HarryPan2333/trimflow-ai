@@ -1,6 +1,7 @@
 "use client";
 
 import "../components/samples/sample-workspace.css";
+import "../components/theme/steep-editorial.css";
 
 import { useMemo, useReducer, useState } from "react";
 import { EmptyState } from "../components/business/empty-state";
@@ -234,7 +235,7 @@ function AIAssistant({ project, showToast }: { project: Project; showToast: (s: 
         <div className="chat-head"><div><h2>{project.code} 项目对话</h2><p><span className="online-dot" /> 项目材料已就绪 · 自动保留无 Key 模拟模式</p></div><button className="icon-btn">⋯</button></div>
         <div className="chat-scroll">
           {loading && <div className="ai-loading"><span className="online-dot" />正在根据当前项目材料整理回答…</div>}
-          {answers.map((item) => <div className="ai-answer" key={item.id}><div className="answer-meta"><span className="sparkle small-sparkle">✦</span><div><strong>{item.title}</strong><small>TrimFlow AI · {item.mode === "live" ? "OpenAI 实时回答" : "模拟回答"}</small></div><div className="answer-actions"><button onClick={() => { navigator.clipboard?.writeText(item.answer); showToast("内容已复制"); }}>复制</button><button onClick={() => void ask(item.title)}>重新生成</button></div></div><div className="answer-content">{item.answer}</div><div className={`prototype-note ${item.mode === "live" ? "live-note" : ""}`}>{item.mode === "live" ? "✓ 回答仅依据当前项目材料，并已通过结构化 JSON 校验。" : "ⓘ 当前为模拟 AI 模式；配置服务器端 API Key 后将自动使用 OpenAI。"}</div></div>)}
+          {answers.map((item) => <div className="ai-answer" key={item.id}><div className="answer-meta"><span className="sparkle small-sparkle">✦</span><div><strong>{item.title}</strong><small>TrimFlow AI · {item.mode === "live" ? "OpenAI 实时回答" : "模拟回答"}</small></div><div className="answer-actions"><button onClick={() => { void navigator.clipboard?.writeText(item.answer).catch(() => undefined); showToast("内容已复制"); }}>复制</button><button onClick={() => void ask(item.title)}>重新生成</button></div></div><div className="answer-content">{item.answer}</div><div className={`prototype-note ${item.mode === "live" ? "live-note" : ""}`}>{item.mode === "live" ? "✓ 回答仅依据当前项目材料，并已通过结构化 JSON 校验。" : "ⓘ 当前为模拟 AI 模式；配置服务器端 API Key 后将自动使用 OpenAI。"}</div></div>)}
         </div>
         <form className="chat-input" onSubmit={(e) => { e.preventDefault(); void ask(input); }}><textarea value={input} disabled={loading} onChange={(e) => setInput(e.target.value)} placeholder="询问关于此项目的任何问题..." rows={2} /><div><span>AI 仅参考当前项目的需求、沟通、样品和报价材料</span><Button type="submit" disabled={loading}>{loading ? "生成中…" : "发送　↑"}</Button></div></form>
       </div>

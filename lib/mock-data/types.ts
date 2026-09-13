@@ -29,7 +29,9 @@ export type SampleStatus =
   | "已确认"
   | "已关闭";
 export type QuotationStatus = "Draft" | "Internal Review" | "Sent" | "Negotiating" | "Accepted" | "Rejected" | "Expired";
-export type OrderStage = "PO Received" | "Contract" | "Production" | "Delivery" | "Shipment" | "Completed";
+export type OrderStage = "PO Received" | "Contract" | "Production" | "Approval" | "Delivery" | "Shipment" | "Payment" | "Completed";
+export type OrderHealth = "On Track" | "Attention" | "At Risk" | "Blocked";
+export type PaymentStatus = "Not Due" | "Pending" | "Partial" | "Paid" | "Overdue";
 export type TimelineEventType =
   | "inquiry"
   | "requirement"
@@ -306,7 +308,75 @@ export type PurchaseOrder = {
   currentStage: OrderStage;
   health: HealthStatus;
   owner: string;
-  paymentStatus: "未到期" | "部分付款" | "已付款";
+  paymentStatus: "未到期" | "部分付款" | "已付款" | PaymentStatus;
+  paymentTerm?: string;
+  incoterm?: string;
+  shipTo?: string;
+  expectedPaymentDate?: string;
+  paidAmount?: number;
+  production?: ProductionStatus;
+  productionMilestones?: ProductionMilestone[];
+  approvals?: OrderApproval[];
+  documents?: OrderDocument[];
+  issues?: OrderIssue[];
+  executionTimeline?: OrderTimelineEvent[];
+};
+
+export type ProductionStatus = {
+  factory: string;
+  startDate?: string;
+  targetCompletion: string;
+  progress: number;
+  quantity: number;
+  completedQuantity: number;
+  status: "Not Started" | "In Production" | "Completed" | "Delayed";
+};
+
+export type ProductionMilestone = {
+  id: string;
+  label: "Material Ready" | "Production Start" | "Mid-production Check" | "Bulk Completion" | "Packing Complete";
+  targetDate: string;
+  actualDate?: string;
+  owner: string;
+  status: "Completed" | "Current" | "Pending" | "Blocked";
+  dependency?: string;
+};
+
+export type OrderApproval = {
+  id: string;
+  type: "Bulk Sample Approval" | "Color Approval" | "Quality Approval" | "Testing Approval";
+  requirement: string;
+  status: "Pending" | "Approved" | "Revision Required" | "Not Required";
+  date?: string;
+  owner: string;
+  note: string;
+  blocking: boolean;
+};
+
+export type OrderDocument = {
+  id: string;
+  name: "Contract" | "Commercial Invoice" | "Packing List" | "Test Report";
+  status: "Available" | "Pending" | "Not Required";
+};
+
+export type OrderIssue = {
+  id: string;
+  type: "Contract" | "Production" | "Quality" | "Testing" | "Delivery" | "Shipment" | "Payment" | "Customer Dependency";
+  severity: "High" | "Medium" | "Low";
+  issue: string;
+  impact: string;
+  owner: string;
+  action: string;
+  blocking: boolean;
+  resolved: boolean;
+};
+
+export type OrderTimelineEvent = {
+  id: string;
+  category: "Commercial" | "Production" | "Quality" | "Logistics" | "Payment";
+  date: string;
+  title: string;
+  detail: string;
 };
 
 export type OrderLine = {
@@ -364,8 +434,13 @@ export type Contract = {
   purchaseOrderId: string;
   projectId: number;
   contractNumber: string;
-  status: "Draft" | "Reviewing" | "Confirmed";
+  status: "Draft" | "Reviewing" | "Under Review" | "Confirmed" | "Signed";
+  createdDate?: string;
   confirmedAt?: string;
+  signedDate?: string;
+  paymentTerm?: string;
+  incoterm?: string;
+  contractValue?: number;
   owner: string;
 };
 
@@ -376,7 +451,9 @@ export type Delivery = {
   plannedDate: string;
   actualDate?: string;
   quantity: number;
-  status: "Pending" | "Ready" | "Delivered";
+  destination?: string;
+  method?: string;
+  status: "Pending" | "Planned" | "Ready" | "Dispatched" | "Delivered";
 };
 
 export type Shipment = {
@@ -384,11 +461,17 @@ export type Shipment = {
   purchaseOrderId: string;
   projectId: number;
   method: string;
+  carrier?: string;
+  reference?: string;
   destination: string;
   etd?: string;
   eta?: string;
   status: "Pending" | "Ready" | "Shipped" | "In Transit" | "Delivered";
   trackingNumber?: string;
+  bookingDate?: string;
+  cargoReadyDate?: string;
+  departedDate?: string;
+  deliveredDate?: string;
 };
 
 export type WeeklyReport = {

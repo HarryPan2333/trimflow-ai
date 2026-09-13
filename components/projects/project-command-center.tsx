@@ -19,6 +19,7 @@ import { getSampleContext } from "../samples/sample-data";
 import type { SampleWorkspace } from "../samples/sample-data";
 import type { InterfaceLanguage } from "../layout/workspace-shell";
 import type { QuotationWorkspace } from "../quotations/quotation-data";
+import type { OrderWorkspace } from "../orders/order-data";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
@@ -42,22 +43,26 @@ type ProjectCommandCenterProps = {
   aiCopilot: ReactNode;
   sampleWorkspace: SampleWorkspace;
   quotationWorkspace: QuotationWorkspace;
+  orderWorkspace: OrderWorkspace;
   onOpenSample: (id: string) => void;
   onOpenQuotation: (id: string) => void;
   onCreateQuotation: () => void;
+  onOpenOrder: (id: string) => void;
   language: InterfaceLanguage;
-  initialTab?: "overview" | "samples" | "quotations";
+  initialTab?: "overview" | "samples" | "quotations" | "orders";
 };
 
-export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, onOpenSample, onOpenQuotation, onCreateQuotation, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
   const data = useMemo(() => {
     const base = getProjectCommandData(project);
     const projectQuotes = quotationWorkspace.quotations.filter((item) => item.projectId === project.id);
     const quoteIds = new Set(projectQuotes.map((item) => item.id));
-    return { ...base, samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id) };
-  }, [project, quotationWorkspace, sampleWorkspace]);
+    const projectOrders = orderWorkspace.orders.filter((item) => item.projectId === project.id);
+    const orderIds = new Set(projectOrders.map((item) => item.id));
+    return { ...base, samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id), purchaseOrders: projectOrders, orderLines: orderWorkspace.lines.filter((item) => orderIds.has(item.purchaseOrderId)), contracts: orderWorkspace.contracts.filter((item) => item.projectId === project.id), deliveries: orderWorkspace.deliveries.filter((item) => item.projectId === project.id), shipments: orderWorkspace.shipments.filter((item) => item.projectId === project.id) };
+  }, [orderWorkspace, project, quotationWorkspace, sampleWorkspace]);
   const [localEvents, setLocalEvents] = useState<TimelineEvent[]>(data.timeline);
   const priority = getOpportunityPriority(data);
   const opportunity = getCommercialOpportunity(data);
@@ -92,7 +97,7 @@ export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, s
       {tab === "samples" && <Card className="sample-workspace sample-list-panel"><div className="sample-section-head"><div><h2>项目样品 / Project Samples</h2><p>{project.code} · 点击样品进入开发工作区</p></div><Badge>Demo Workspace</Badge></div><SampleList rows={data.samples.map((sample) => getSampleContext(sample, sampleWorkspace, [project]))} onOpenSample={onOpenSample} language={language} /></Card>}
       {tab === "quotations" && <QuotationsPanel data={data} onOpen={onOpenQuotation} onCreate={onCreateQuotation} />}
       {tab === "communications" && <CommunicationsPanel data={data} onAdd={() => setActivityModal(true)} />}
-      {tab === "orders" && <OrdersPanel data={data} />}
+      {tab === "orders" && <OrdersPanel data={data} onOpenOrder={onOpenOrder} />}
       {tab === "timeline" && <TimelinePanel events={localEvents} />}
       {tab === "ai" && aiCopilot}
 
@@ -115,10 +120,10 @@ function CommunicationsPanel({ data, onAdd }: { data: ReturnType<typeof getProje
   return <Card className="command-tab-panel"><div className="compact-section-head"><div><h2>沟通记录</h2><p>Communications · 客户信号与内部协作</p></div><Button onClick={onAdd}>＋ 添加活动</Button></div><div className="project-communications">{[...data.communications].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).map((item) => <article key={item.id}><div><Badge>{item.type}</Badge><span>{new Date(item.occurredAt).toLocaleDateString("zh-CN")}</span></div><strong>{item.subject}</strong><p>{item.content}</p><small>{item.author} · {item.language}</small></article>)}{data.communications.length === 0 && <p className="command-empty">当前项目尚无沟通记录。</p>}</div></Card>;
 }
 
-function OrdersPanel({ data }: { data: ReturnType<typeof getProjectCommandData> }) {
+function OrdersPanel({ data, onOpenOrder }: { data: ReturnType<typeof getProjectCommandData>; onOpenOrder: (id: string) => void }) {
   const po = data.purchaseOrders[0];
   if (!po) return <Card className="command-empty command-tab-panel">当前项目尚未创建 Purchase Order。</Card>;
-  return <Card className="command-tab-panel order-flow-panel"><div className="compact-section-head"><div><h2>{po.poNumber}</h2><p>PO → Contract → Delivery → Shipment</p></div><StatusBadge status={po.currentStage} /></div><div className="order-flow"><div><span>PO</span><strong>{po.currency} {po.amount.toLocaleString("en-US")}</strong><small>{po.poDate}</small></div><div><span>Contract</span><strong>{data.contracts[0]?.status ?? "Pending"}</strong><small>{data.contracts[0]?.contractNumber ?? "尚未确认"}</small></div><div><span>Delivery</span><strong>{data.deliveries[0]?.status ?? "Pending"}</strong><small>{data.deliveries[0]?.plannedDate ?? po.deliveryDate}</small></div><div><span>Shipment</span><strong>{data.shipments[0]?.status ?? "Pending"}</strong><small>{data.shipments[0]?.etd ?? "尚未确认"}</small></div></div><p className="prototype-note">订单中心完整功能将在 Step 7 实现。</p></Card>;
+  return <Card className="command-tab-panel order-flow-panel"><div className="compact-section-head"><div><h2>{po.poNumber}</h2><p>PO → Contract → Production → Approval → Delivery → Shipment → Payment</p></div><StatusBadge status={po.currentStage} /></div><div className="order-flow"><div><span>PO</span><strong>{po.currency} {po.amount.toLocaleString("en-US")}</strong><small>{po.poDate}</small></div><div><span>Contract</span><strong>{data.contracts[0]?.status ?? "Pending"}</strong><small>{data.contracts[0]?.contractNumber ?? "尚未确认"}</small></div><div><span>Production</span><strong>{po.production?.status ?? "Not Started"}</strong><small>{po.production?.progress ?? 0}%</small></div><div><span>Delivery</span><strong>{data.deliveries[0]?.status ?? "Pending"}</strong><small>{data.deliveries[0]?.plannedDate ?? po.deliveryDate}</small></div><div><span>Shipment</span><strong>{data.shipments[0]?.status ?? "Pending"}</strong><small>{data.shipments[0]?.etd ?? "尚未确认"}</small></div></div><Button onClick={() => onOpenOrder(po.id)}>进入订单执行工作区 →</Button></Card>;
 }
 
 function TimelinePanel({ events }: { events: TimelineEvent[] }) {

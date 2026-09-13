@@ -2,6 +2,7 @@
 
 import "../components/samples/sample-workspace.css";
 import "../components/quotations/quotation-workspace.css";
+import "../components/orders/order-workspace.css";
 import "../components/theme/steep-editorial.css";
 
 import { useMemo, useReducer, useState, useSyncExternalStore } from "react";
@@ -22,6 +23,10 @@ import { QuotationCenter } from "../components/quotations/quotation-center";
 import { QuotationDetail } from "../components/quotations/quotation-detail";
 import { createDraftFromSample, createQuotationWorkspace, getQuotationContext, quotationWorkspaceReducer } from "../components/quotations/quotation-data";
 import type { QuotationWorkspace } from "../components/quotations/quotation-data";
+import { OrderCenter } from "../components/orders/order-center";
+import { OrderDetail } from "../components/orders/order-detail";
+import { createOrderFromQuote, createOrderWorkspace, getOrderContext, orderWorkspaceReducer } from "../components/orders/order-data";
+import type { OrderWorkspace } from "../components/orders/order-data";
 import { Badge, Button, Card, Modal } from "../components/ui/primitives";
 import {
   projects as initialProjects,
@@ -32,9 +37,9 @@ import {
 import type { Project, ProjectStage as Stage } from "../lib/mock-data";
 
 type OutputLanguage = "中文" | "英文" | "中英对照";
-type View = WorkspaceView | "detail" | "sample-detail" | "quotation-detail";
+type View = WorkspaceView | "detail" | "sample-detail" | "quotation-detail" | "order-detail";
 
-const placeholderViews = new Set<WorkspaceView>(["clients", "orders", "fulfillment"]);
+const placeholderViews = new Set<WorkspaceView>(["clients", "fulfillment"]);
 
 const aiPrompts = ["总结当前项目", "还有哪些信息待确认？", "生成下一步行动", "生成客户英文回复", "生成内部中文任务单", "生成项目周报", "准备价格谈判方案", "当前项目有哪些风险？"];
 
@@ -135,9 +140,11 @@ function ProjectDetail({
   showToast,
   sampleWorkspace,
   quotationWorkspace,
+  orderWorkspace,
   onOpenSample,
   onOpenQuotation,
   onCreateQuotation,
+  onOpenOrder,
   language,
   initialTab,
 }: {
@@ -147,11 +154,13 @@ function ProjectDetail({
   showToast: (s: string) => void;
   sampleWorkspace: SampleWorkspace;
   quotationWorkspace: QuotationWorkspace;
+  orderWorkspace: OrderWorkspace;
   onOpenSample: (id: string) => void;
   onOpenQuotation: (id: string) => void;
   onCreateQuotation: () => void;
+  onOpenOrder: (id: string) => void;
   language: InterfaceLanguage;
-  initialTab: "overview" | "samples" | "quotations";
+  initialTab: "overview" | "samples" | "quotations" | "orders";
 }) {
   return (
     <ProjectCommandCenter
@@ -163,9 +172,11 @@ function ProjectDetail({
       showToast={showToast}
       sampleWorkspace={sampleWorkspace}
       quotationWorkspace={quotationWorkspace}
+      orderWorkspace={orderWorkspace}
       onOpenSample={onOpenSample}
       onOpenQuotation={onOpenQuotation}
       onCreateQuotation={onCreateQuotation}
+      onOpenOrder={onOpenOrder}
       language={language}
       initialTab={initialTab}
       aiCopilot={<AIAssistant project={project} showToast={showToast} />}
@@ -310,29 +321,33 @@ export default function Home() {
   const [activeProject, setActiveProject] = useState<Project>(initialProjects[0]);
   const [sampleWorkspace, dispatchSample] = useReducer(sampleWorkspaceReducer, undefined, createSampleWorkspace);
   const [quotationWorkspace, dispatchQuotation] = useReducer(quotationWorkspaceReducer, undefined, createQuotationWorkspace);
+  const [orderWorkspace, dispatchOrder] = useReducer(orderWorkspaceReducer, undefined, createOrderWorkspace);
   const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
   const [activeQuotationId, setActiveQuotationId] = useState<string | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [sampleClientId, setSampleClientId] = useState<string | null>(null);
-  const [projectTab, setProjectTab] = useState<"overview" | "samples" | "quotations">("overview");
+  const [projectTab, setProjectTab] = useState<"overview" | "samples" | "quotations" | "orders">("overview");
   const [language, setLanguage] = useState<InterfaceLanguage>("中文");
   const [newProject, setNewProject] = useState(false);
   const [toast, setToast] = useState("");
   const embedded = useSyncExternalStore(subscribeToLocation, readEmbeddedMode, readServerEmbeddedMode);
   const showToast = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(""), 2500); };
-  const openProject = (p: Project, initialTab: "overview" | "samples" | "quotations" = "overview") => { setProjectTab(initialTab); setActiveProject(p); setView("detail"); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const openProject = (p: Project, initialTab: "overview" | "samples" | "quotations" | "orders" = "overview") => { setProjectTab(initialTab); setActiveProject(p); setView("detail"); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const openSample = (id: string) => { setActiveSampleId(id); setView("sample-detail"); window.scrollTo({ top: 0 }); };
   const openQuotation = (id: string) => { setActiveQuotationId(id); setView("quotation-detail"); window.scrollTo({ top: 0 }); };
+  const openOrder = (id: string) => { setActiveOrderId(id); setView("order-detail"); window.scrollTo({ top: 0 }); };
   const activeSample = sampleWorkspace.samples.find((sample) => sample.id === activeSampleId);
   const activeQuotation = quotationWorkspace.quotations.find((quotation) => quotation.id === activeQuotationId);
+  const activeOrder = orderWorkspace.orders.find((order) => order.id === activeOrderId);
   const sampleClient = clients.find((client) => client.id === sampleClientId);
   const updateStage = (stage: Stage) => {
     setActiveProject((p) => ({ ...p, stage }));
     setProjects((all) => all.map((p) => p.id === activeProject.id ? { ...p, stage } : p));
     showToast(`项目阶段已更新为“${stage}”`);
   };
-  const activeNav: WorkspaceView = view === "detail" ? "projects" : view === "sample-detail" ? "samples" : view === "quotation-detail" ? "quotations" : view;
+  const activeNav: WorkspaceView = view === "detail" ? "projects" : view === "sample-detail" ? "samples" : view === "quotation-detail" ? "quotations" : view === "order-detail" ? "orders" : view;
   const title = useMemo(() => workspaceNavigation.find((item) => item.id === activeNav)?.label || "工作台", [activeNav]);
-  const isPlaceholder = view !== "detail" && view !== "sample-detail" && view !== "quotation-detail" && placeholderViews.has(view) && !(view === "clients" && sampleClient);
+  const isPlaceholder = view !== "detail" && view !== "sample-detail" && view !== "quotation-detail" && view !== "order-detail" && placeholderViews.has(view) && !(view === "clients" && sampleClient);
   const createOrOpenQuotation = (sampleId: string) => {
     const sample = sampleWorkspace.samples.find((item) => item.id === sampleId);
     if (!sample) return;
@@ -361,6 +376,28 @@ export default function Home() {
       setView("quotations");
       showToast("该项目尚无满足报价交接条件的确认样");
     }
+  };
+  const createOrOpenOrder = (quotationId: string) => {
+    const quotation = quotationWorkspace.quotations.find((item) => item.id === quotationId);
+    if (!quotation) {
+      showToast("未找到关联报价，无法创建采购订单");
+      return;
+    }
+    const result = createOrderFromQuote(quotation, orderWorkspace, projects);
+    if ("existing" in result && result.existing) {
+      openOrder(result.existing.id);
+      showToast("该报价已关联采购订单，已打开现有订单");
+      return;
+    }
+    if ("blocked" in result && result.blocked) {
+      showToast("只有已接受的报价才能创建采购订单");
+      return;
+    }
+    dispatchOrder({ type: "create", order: result.order, lines: result.lines, contract: result.contract, delivery: result.delivery, shipment: result.shipment });
+    setActiveOrderId(result.order.id);
+    setView("order-detail");
+    window.scrollTo({ top: 0 });
+    showToast("已从 Accepted Quotation 创建演示采购订单");
   };
   const changeLanguage = (nextLanguage: InterfaceLanguage) => {
     setLanguage(nextLanguage);
@@ -399,11 +436,13 @@ export default function Home() {
       >
           {view === "dashboard" && <DashboardView projects={projects} onOpenProject={openProject} onNavigate={setView} onOpenNewProject={() => setNewProject(true)} />}
           {view === "projects" && <Projects projects={projects} openProject={openProject} openNew={() => setNewProject(true)} />}
-          {view === "detail" && <ProjectDetail project={activeProject} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} language={language} initialTab={projectTab} />}
+          {view === "detail" && <ProjectDetail project={activeProject} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} orderWorkspace={orderWorkspace} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} onOpenOrder={openOrder} language={language} initialTab={projectTab} />}
           {view === "samples" && <SampleCenter workspace={sampleWorkspace} projects={projects} onOpenSample={openSample} language={language} />}
           {view === "sample-detail" && activeSample && <SampleDetail key={activeSample.id} context={getSampleContext(activeSample, sampleWorkspace, projects)} language={language} dispatch={dispatchSample} onBack={() => setView("samples")} onProject={() => { const p = projects.find((project) => project.id === activeSample.projectId); if (p) openProject(p, "samples"); }} onClient={() => { setSampleClientId(activeSample.clientId); setView("clients"); window.scrollTo({ top: 0 }); }} onCreateQuotation={() => createOrOpenQuotation(activeSample.id)} showToast={showToast} />}
           {view === "quotations" && <QuotationCenter workspace={quotationWorkspace} projects={projects} language={language} onOpenQuotation={openQuotation} onCreate={() => createForProject(activeProject)} />}
-          {view === "quotation-detail" && activeQuotation && <QuotationDetail key={activeQuotation.id} context={getQuotationContext(activeQuotation, quotationWorkspace, projects)} language={language} dispatch={dispatchQuotation} onBack={() => setView("quotations")} onProject={() => { const p = projects.find((project) => project.id === activeQuotation.projectId); if (p) openProject(p, "quotations"); }} onSample={openSample} onOpenVersion={openQuotation} onCreatePO={() => showToast("订单交接将在 Step 7 完成；当前已保留 Accepted Quotation 关联")} showToast={showToast} />}
+          {view === "quotation-detail" && activeQuotation && <QuotationDetail key={activeQuotation.id} context={getQuotationContext(activeQuotation, quotationWorkspace, projects)} language={language} dispatch={dispatchQuotation} onBack={() => setView("quotations")} onProject={() => { const p = projects.find((project) => project.id === activeQuotation.projectId); if (p) openProject(p, "quotations"); }} onSample={openSample} onOpenVersion={openQuotation} onCreatePO={() => createOrOpenOrder(activeQuotation.id)} showToast={showToast} />}
+          {view === "orders" && <OrderCenter workspace={orderWorkspace} quotationWorkspace={quotationWorkspace} projects={projects} language={language} onOpenOrder={openOrder} />}
+          {view === "order-detail" && activeOrder && <OrderDetail key={activeOrder.id} context={getOrderContext(activeOrder, orderWorkspace, quotationWorkspace, projects)} language={language} dispatch={dispatchOrder} onBack={() => setView("orders")} onClient={() => { setSampleClientId(activeOrder.clientId); setView("clients"); window.scrollTo({ top: 0 }); }} onProject={() => { const p = projects.find((project) => project.id === activeOrder.projectId); if (p) openProject(p, "orders"); }} onQuotation={() => openQuotation(activeOrder.quotationId)} showToast={showToast} />}
           {view === "clients" && sampleClient && <div className="sample-workspace"><button className="back-link" onClick={() => activeSampleId ? openSample(activeSampleId) : setView("samples")}>‹ 返回样品 / Back to Sample</button><PageHeader title={sampleClient.name} subtitle={`${sampleClient.code} · ${sampleClient.country} · ${sampleClient.region}`} /><Card className="sample-section"><div className="sample-section-head"><h2>客户关联 / Client Reference</h2><Badge>{sampleClient.type}</Badge></div><p className="sample-resource-note">这是样品关联的客户资料预览；完整客户中心将在后续阶段完成。</p><div className="sample-client-projects">{projects.filter((project) => project.clientId === sampleClient.id).map((project) => <button key={project.id} onClick={() => openProject(project, "samples")}><strong>{project.code} · {project.name}</strong><span>查看项目与样品 →</span></button>)}</div></Card></div>}
           {view === "todos" && <Todos showToast={showToast} />}
           {view === "reports" && <Reports showToast={showToast} />}

@@ -515,8 +515,8 @@ select,
 .quote-version-history > button.current { background: var(--color-blush-peach); color: var(--color-sienna-brown); }
 .sample-comparison-table td:last-child,
 .quote-comparison-table td:last-child { background: #f7ece6; color: var(--color-sienna-brown); }
-.sample-next-card,
-.quote-next { border: 0; background: var(--color-blush-peach); color: var(--color-sienna-brown); }
+.sample-next-card { border: 0; background: var(--color-blush-peach); color: var(--color-sienna-brown); }
+.quote-next { border: 0; background: white; color: var(--color-ink-black); box-shadow: var(--shadow-artifact); }
 .strategy-card { background: var(--color-blush-peach); color: var(--color-sienna-brown); }
 .strategy-card .compact-section-head { border-color: rgba(93, 42, 26, .16); }
 .strategy-card h2,
@@ -526,17 +526,17 @@ select,
 .strategy-card li { color: var(--color-sienna-brown); }
 .strategy-card .badge,
 .strategy-card .strategy-guardrails p { background: rgba(255, 255, 255, .55); color: var(--color-sienna-brown); }
-.sample-next-card .sample-section-head,
-.quote-next .quote-section-head { border-color: rgba(93, 42, 26, .16); }
+.sample-next-card .sample-section-head { border-color: rgba(93, 42, 26, .16); }
+.quote-next .quote-section-head { border-color: #dedee0; }
 .sample-next-card h2,
 .sample-next-card h3,
 .sample-next-card p,
 .sample-next-card dt,
-.sample-next-card dd,
+.sample-next-card dd { color: var(--color-sienna-brown); }
 .quote-next h2,
+.quote-next strong { color: var(--color-ink-black); }
 .quote-next p,
-.quote-next strong,
-.quote-next small { color: var(--color-sienna-brown); }
+.quote-next small { color: var(--color-slate-gray); }
 .quote-next-list article,
 .sample-next-body dl { border-color: rgba(93, 42, 26, .16); }
 .quote-next-list article > span { background: rgba(255, 255, 255, .58); color: var(--color-sienna-brown); }

@@ -18,6 +18,7 @@ import { SampleList } from "../samples/sample-list";
 import { getSampleContext } from "../samples/sample-data";
 import type { SampleWorkspace } from "../samples/sample-data";
 import type { InterfaceLanguage } from "../layout/workspace-shell";
+import type { QuotationWorkspace } from "../quotations/quotation-data";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
@@ -40,15 +41,23 @@ type ProjectCommandCenterProps = {
   showToast: (message: string) => void;
   aiCopilot: ReactNode;
   sampleWorkspace: SampleWorkspace;
+  quotationWorkspace: QuotationWorkspace;
   onOpenSample: (id: string) => void;
+  onOpenQuotation: (id: string) => void;
+  onCreateQuotation: () => void;
   language: InterfaceLanguage;
-  initialTab?: "overview" | "samples";
+  initialTab?: "overview" | "samples" | "quotations";
 };
 
-export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, onOpenSample, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, onOpenSample, onOpenQuotation, onCreateQuotation, language, initialTab = "overview" }: ProjectCommandCenterProps) {
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
-  const data = useMemo(() => ({ ...getProjectCommandData(project), samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id) }), [project, sampleWorkspace]);
+  const data = useMemo(() => {
+    const base = getProjectCommandData(project);
+    const projectQuotes = quotationWorkspace.quotations.filter((item) => item.projectId === project.id);
+    const quoteIds = new Set(projectQuotes.map((item) => item.id));
+    return { ...base, samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id) };
+  }, [project, quotationWorkspace, sampleWorkspace]);
   const [localEvents, setLocalEvents] = useState<TimelineEvent[]>(data.timeline);
   const priority = getOpportunityPriority(data);
   const opportunity = getCommercialOpportunity(data);
@@ -66,7 +75,7 @@ export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, s
 
   return (
     <div className="project-command-center">
-      <ProjectHeader data={data} priority={priority} expectedValue={opportunity.estimatedValue} stages={stages} onBack={onBack} onUpdateStage={onUpdateStage} onAddActivity={() => setActivityModal(true)} onCreateSample={() => { setTab("samples"); showToast("已打开项目样品；选择样品可创建后续版本"); }} onCreateQuote={() => { setTab("quotations"); showToast("已打开报价页签；创建流程将在 Step 6 完成"); }} onEditProject={() => showToast("编辑项目为当前原型模拟操作")} />
+      <ProjectHeader data={data} priority={priority} expectedValue={opportunity.estimatedValue} stages={stages} onBack={onBack} onUpdateStage={onUpdateStage} onAddActivity={() => setActivityModal(true)} onCreateSample={() => { setTab("samples"); showToast("已打开项目样品；选择样品可创建后续版本"); }} onCreateQuote={() => { setTab("quotations"); if (data.quotations.length) showToast("已打开项目报价；点击记录进入谈判工作区"); else onCreateQuotation(); }} onEditProject={() => showToast("编辑项目为当前原型模拟操作")} />
 
       <Card className="project-lifecycle-card">
         <div className="lifecycle-card-head"><div><span>Lifecycle Control</span><strong>项目生命周期控制</strong></div><StatusBadge status={project.lifecycleStage} /></div>
@@ -81,7 +90,7 @@ export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, s
       {tab === "overview" && <ProjectOverview data={data} events={localEvents} onViewTimeline={() => setTab("timeline")} />}
       {tab === "requirements" && <RequirementsPanel data={data} />}
       {tab === "samples" && <Card className="sample-workspace sample-list-panel"><div className="sample-section-head"><div><h2>项目样品 / Project Samples</h2><p>{project.code} · 点击样品进入开发工作区</p></div><Badge>Demo Workspace</Badge></div><SampleList rows={data.samples.map((sample) => getSampleContext(sample, sampleWorkspace, [project]))} onOpenSample={onOpenSample} language={language} /></Card>}
-      {tab === "quotations" && <QuotationsPanel data={data} />}
+      {tab === "quotations" && <QuotationsPanel data={data} onOpen={onOpenQuotation} onCreate={onCreateQuotation} />}
       {tab === "communications" && <CommunicationsPanel data={data} onAdd={() => setActivityModal(true)} />}
       {tab === "orders" && <OrdersPanel data={data} />}
       {tab === "timeline" && <TimelinePanel events={localEvents} />}
@@ -98,8 +107,8 @@ function RequirementsPanel({ data }: { data: ReturnType<typeof getProjectCommand
   return <Card className="table-card command-tab-panel"><div className="compact-section-head"><div><h2>结构化产品需求</h2><p>Requirements · 当前项目专属资料</p></div><Badge tone="blue">{completeness}% 完整</Badge></div><div className="table-wrap"><table><thead><tr><th>产品 / Product</th><th>业务字段 / Business Field</th><th>当前值 / Current Value</th><th>状态 / Status</th><th>来源 / Source</th></tr></thead><tbody>{data.requirements.map((item) => <tr key={item.id}><td>{item.product}</td><td><strong>{item.field} / {item.fieldEn}</strong></td><td>{item.value}</td><td><Badge tone={item.status === "已确认" ? "green" : item.status === "有冲突" ? "red" : "amber"}>{item.status}</Badge></td><td>{item.source}</td></tr>)}{data.requirements.length === 0 && <tr><td colSpan={5}>当前项目材料中尚未确认产品需求。</td></tr>}</tbody></table></div></Card>;
 }
 
-function QuotationsPanel({ data }: { data: ReturnType<typeof getProjectCommandData> }) {
-  return <div className="command-entity-grid">{data.quotations.map((quote) => <Card className="entity-summary-card" key={quote.id}><div className="entity-card-head"><div><span>{quote.id}</span><h2>Quotation {quote.version}</h2></div><StatusBadge status={quote.status} /></div><strong className="entity-price">{quote.currency} {quote.unitPrice} <small>/ {quote.unit}</small></strong><dl><div><dt>Quantity</dt><dd>{quote.quantity.toLocaleString("en-US")}</dd></div><div><dt>Target Price</dt><dd>{quote.targetPrice ? `${quote.currency} ${quote.targetPrice}` : "尚未确认"}</dd></div><div><dt>Valid Until</dt><dd>{quote.validUntil}</dd></div><div><dt>Client Feedback</dt><dd>{quote.clientFeedback}</dd></div></dl><p className="prototype-note">报价中心完整功能将在 Step 6 实现。</p></Card>)}{data.quotations.length === 0 && <Card className="command-empty">当前项目尚无正式报价。</Card>}</div>;
+function QuotationsPanel({ data, onOpen, onCreate }: { data: ReturnType<typeof getProjectCommandData>; onOpen: (id: string) => void; onCreate: () => void }) {
+  return <div className="command-entity-grid">{data.quotations.map((quote) => <Card className="entity-summary-card" key={quote.id}><div className="entity-card-head"><div><span>{quote.id}</span><h2>Quotation {quote.version}</h2></div><StatusBadge status={quote.status} /></div><strong className="entity-price">{quote.unitPrice ? `${quote.currency} ${quote.unitPrice}` : "待填写 / Pending"} <small>/ {quote.unit}</small></strong><dl><div><dt>Quantity</dt><dd>{quote.quantity ? quote.quantity.toLocaleString("en-US") : "尚未确认"}</dd></div><div><dt>Target Price</dt><dd>{quote.targetPrice ? `${quote.currency} ${quote.targetPrice}` : "尚未确认"}</dd></div><div><dt>Valid Until</dt><dd>{quote.validUntil || "尚未确认"}</dd></div><div><dt>Client Feedback</dt><dd>{quote.clientFeedback}</dd></div></dl><Button variant="secondary" onClick={() => onOpen(quote.id)}>查看报价与谈判 →</Button></Card>)}{data.quotations.length === 0 && <Card className="command-empty"><p>当前项目尚无正式报价。</p><Button onClick={onCreate}>从确认样创建报价 / Create from Approved Sample</Button></Card>}</div>;
 }
 
 function CommunicationsPanel({ data, onAdd }: { data: ReturnType<typeof getProjectCommandData>; onAdd: () => void }) {

@@ -16,12 +16,11 @@ import type { SampleAction, SampleContext } from "./sample-data";
 
 type ModalKind = "feedback" | "revision" | "sent" | "approved" | null;
 
-export function SampleDetail({ context, language, dispatch, onBack, onProject, onClient, showToast }: { context: SampleContext; language: InterfaceLanguage; dispatch: Dispatch<SampleAction>; onBack: () => void; onProject: () => void; onClient: () => void; showToast: (message: string) => void }) {
+export function SampleDetail({ context, language, dispatch, onBack, onProject, onClient, onCreateQuotation, showToast }: { context: SampleContext; language: InterfaceLanguage; dispatch: Dispatch<SampleAction>; onBack: () => void; onProject: () => void; onClient: () => void; onCreateQuotation: () => void; showToast: (message: string) => void }) {
   const [modal, setModal] = useState<ModalKind>(null);
   const [resolveId, setResolveId] = useState<string | null>(null);
   const isEn = language === "English";
   const notify = (action: string) => { setModal(null); showToast(`${action} · Demo Workspace`); };
-  const quotation = () => showToast(isEn ? "Quotation workflow will be completed in Step 6." : "报价流程将在 Step 6 完成；当前仅演示样品交接。 ");
   const openFeedback = getOpenRevisionFeedback(context);
   const rows = getSpecificationRows(context);
   const makeFeedback = (form: FormData, approved = false): SampleFeedback => ({
@@ -59,7 +58,7 @@ export function SampleDetail({ context, language, dispatch, onBack, onProject, o
       <SampleFeedbackPanel context={context} onAdd={() => setModal("feedback")} onResolve={setResolveId} onRevision={() => setModal("revision")} />
       <SampleSpecification context={context} />
       <DesignInOpportunity context={context} />
-    </div><aside className="sample-side-column"><SampleNextAction context={context} /><SampleReadiness context={context} onQuotation={quotation} /><SampleBlockers context={context} /><SampleLogistics context={context} /><SampleCost context={context} /></aside></div>
+    </div><aside className="sample-side-column"><SampleNextAction context={context} /><SampleReadiness context={context} onQuotation={onCreateQuotation} /><SampleBlockers context={context} /><SampleLogistics context={context} /><SampleCost context={context} /></aside></div>
     <p className="sample-demo-note">{isEn ? "Demo Workspace · Session changes reset when you refresh." : demoNotice}</p>
 
     {modal === "feedback" && <Modal title="添加客户反馈 / Add Feedback" onClose={() => setModal(null)}><form className="modal-form sample-modal-form" onSubmit={submitFeedback}>

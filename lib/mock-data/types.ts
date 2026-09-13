@@ -28,7 +28,7 @@ export type SampleStatus =
   | "需修改"
   | "已确认"
   | "已关闭";
-export type QuotationStatus = "Draft" | "Sent" | "Negotiating" | "Accepted" | "Rejected" | "Expired";
+export type QuotationStatus = "Draft" | "Internal Review" | "Sent" | "Negotiating" | "Accepted" | "Rejected" | "Expired";
 export type OrderStage = "PO Received" | "Contract" | "Production" | "Delivery" | "Shipment" | "Completed";
 export type TimelineEventType =
   | "inquiry"
@@ -213,6 +213,18 @@ export type SampleFeedback = {
   resolvedInVersionId?: string;
 };
 
+export type QuotationLineItem = {
+  id: string;
+  quotationId: string;
+  product: string;
+  specification: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  amount: number;
+  currency: "USD" | "EUR" | "CNY";
+};
+
 export type Quotation = {
   id: string;
   clientId: string;
@@ -227,10 +239,28 @@ export type Quotation = {
   validUntil: string;
   issuedAt: string;
   targetPrice?: number;
+  customerTargetMoq?: number;
+  customerTargetLeadTime?: string;
+  customerPaymentTerm?: string;
+  customerTestingRequirement?: string;
+  customerMaterialFinish?: string;
   internalTargetPrice?: number;
   moq: number;
   incoterm: string;
   clientFeedback: string;
+  approvedSampleId?: string;
+  createdAt?: string;
+  owner?: string;
+  leadTime?: string;
+  paymentTerm?: string;
+  testingRequirement?: string;
+  materialFinish?: string;
+  reasonForRevision?: string;
+  commercialPosition?: "Strong" | "Balanced" | "Aggressive";
+  lastActivityAt?: string;
+  nextAction?: string;
+  additionalFee?: number;
+  lineItems?: QuotationLineItem[];
 };
 
 export type QuotationTier = {
@@ -241,6 +271,10 @@ export type QuotationTier = {
   unitPrice: number;
   currency: "USD" | "EUR" | "CNY";
   note?: string;
+  leadTime?: string;
+  moq?: number;
+  commercialPosition?: "Strong" | "Balanced" | "Aggressive";
+  recommended?: boolean;
 };
 
 export type NegotiationRecord = {
@@ -251,6 +285,12 @@ export type NegotiationRecord = {
   direction: "客户反馈" | "内部建议" | "销售回复";
   summary: string;
   nextAction: string;
+  actor?: string;
+  type?: "Quote Sent" | "Target Received" | "Customer Feedback" | "Internal Review" | "Revision" | "Counter Offer" | "Commercial Confirmation";
+  ourPosition?: string;
+  customerPosition?: string;
+  note?: string;
+  nextMove?: string;
 };
 
 export type PurchaseOrder = {

@@ -1,5 +1,6 @@
 import type { BusinessCase, ProjectStage } from "./types";
 import { withSampleDevelopment } from "./sample-development";
+import { withQuotationDevelopment } from "./quotation-development";
 
 export const projectStages: ProjectStage[] = [
   "新询盘",
@@ -390,4 +391,4 @@ const caseC: BusinessCase = {
   ],
 };
 
-export const businessCases: BusinessCase[] = withSampleDevelopment([caseA, caseB, caseC]);
+export const businessCases: BusinessCase[] = withQuotationDevelopment(withSampleDevelopment([caseA, caseB, caseC]));

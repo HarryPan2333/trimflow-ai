@@ -1,6 +1,7 @@
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useI18n } from "../providers/language-provider";
 
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: string }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
@@ -34,6 +35,7 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div
       className="modal-backdrop"
@@ -46,7 +48,7 @@ export function Modal({
             <span className="eyebrow">TRIMFLOW WORKSPACE</span>
             <h2>{title}</h2>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="关闭">
+          <button className="icon-btn" onClick={onClose} aria-label={t("actions.close")}>
             ×
           </button>
         </div>

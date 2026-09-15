@@ -1,3 +1,7 @@
+"use client";
+
+import { useI18n } from "../providers/language-provider";
+
 type HealthBadgeProps = {
   status: string;
   label?: string;
@@ -14,11 +18,12 @@ function healthTone(status: string) {
 }
 
 export function HealthBadge({ status, label, className = "", showDot = true }: HealthBadgeProps) {
+  const { label: localize } = useI18n();
   const tone = healthTone(status);
   return (
     <span className={`${className} health-${tone}`.trim()}>
       {showDot && "● "}
-      {label ?? status}
+      {label ?? localize(status)}
     </span>
   );
 }

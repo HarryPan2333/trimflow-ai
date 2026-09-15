@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { InterfaceLanguage } from "./app-sidebar";
+import { useI18n } from "../providers/language-provider";
 
 export type GlobalCreateType = "project" | "sample" | "quotation" | "task";
 
@@ -20,6 +21,7 @@ const createOptions: Array<{ id: GlobalCreateType; label: string; labelEn: strin
 ];
 
 export function AppTopbar({ currentTitle, language, onLanguageChange, onGlobalCreate }: AppTopbarProps) {
+  const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
   return (
     <header className="topbar">
@@ -28,47 +30,47 @@ export function AppTopbar({ currentTitle, language, onLanguageChange, onGlobalCr
         <strong>TrimFlow AI</strong>
       </div>
       <div className="breadcrumb">
-        <span>销售工作区</span>
+        <span>{t("common.workspace")}</span>
         <b>/</b>
         <strong>{currentTitle}</strong>
       </div>
       <div className="top-actions">
         <label className="global-search">
           <span>⌕</span>
-          <input placeholder="搜索客户、项目、样品、报价..." />
+          <input placeholder={t("common.search")} />
         </label>
         <div className="global-create">
           <button className="global-create-trigger" onClick={() => setCreateOpen((open) => !open)} aria-expanded={createOpen}>
-            ＋ 新建 <span>⌄</span>
+            ＋ {t("topbar.create")} <span>⌄</span>
           </button>
           {createOpen && (
             <div className="global-create-menu" role="menu">
               {createOptions.map((option) => (
                 <button key={option.id} role="menuitem" onClick={() => { setCreateOpen(false); onGlobalCreate?.(option.id); }}>
-                  <strong>{option.label}</strong><span>{option.labelEn}</span>
+                  <strong>{language === "zh" ? option.label : option.labelEn}</strong>{language === "zh" && <span>{option.labelEn}</span>}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <button className="notification" aria-label="查看通知">
+        <button className="notification" aria-label={t("topbar.notifications")}>
           ♧<span />
         </button>
         <div className="language-switch">
           <button
-            className={language === "中文" ? "active" : ""}
-            onClick={() => onLanguageChange("中文")}
+            className={language === "zh" ? "active" : ""}
+            onClick={() => onLanguageChange("zh")}
           >
             中文
           </button>
           <button
-            className={language === "English" ? "active" : ""}
-            onClick={() => onLanguageChange("English")}
+            className={language === "en" ? "active" : ""}
+            onClick={() => onLanguageChange("en")}
           >
             English
           </button>
         </div>
-        <span className="topbar-user" aria-label="当前用户">陈</span>
+        <span className="topbar-user" aria-label={t("topbar.currentUser")}>{language === "zh" ? "陈" : "CC"}</span>
       </div>
     </header>
   );

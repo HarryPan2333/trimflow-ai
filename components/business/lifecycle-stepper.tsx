@@ -1,4 +1,7 @@
+"use client";
+
 import type { LifecycleStage } from "../../lib/mock-data";
+import { useI18n } from "../providers/language-provider";
 
 const lifecycleStages: Array<{ id: LifecycleStage; label: string }> = [
   { id: "inquiry", label: "Inquiry" },
@@ -20,6 +23,7 @@ export type LifecycleMilestone = {
 };
 
 export function LifecycleStepper({ currentStage, milestones }: { currentStage: LifecycleStage; milestones?: LifecycleMilestone[] }) {
+  const { label, text, t } = useI18n();
   const currentIndex = lifecycleStages.findIndex((stage) => stage.id === currentStage);
   const items: LifecycleMilestone[] = milestones ?? lifecycleStages.map((stage, index) => ({
     ...stage,
@@ -27,7 +31,7 @@ export function LifecycleStepper({ currentStage, milestones }: { currentStage: L
   }));
 
   return (
-    <div className="lifecycle-scroll" aria-label="业务生命周期">
+    <div className="lifecycle-scroll" aria-label={t("project.lifecycleControl")}>
       <ol className="lifecycle-stepper">
         {items.map((stage, index) => {
           const state = stage.status;
@@ -37,8 +41,8 @@ export function LifecycleStepper({ currentStage, milestones }: { currentStage: L
                 {state === "completed" ? "✓" : index + 1}
               </span>
               <span className="lifecycle-label" aria-current={state === "current" ? "step" : undefined}>
-                <strong>{stage.label}</strong>
-                {(stage.date || stage.owner) && <small>{stage.date ?? "待确认"}{stage.owner ? ` · ${stage.owner}` : ""}</small>}
+                <strong>{label(stage.label)}</strong>
+                {(stage.date || stage.owner) && <small>{stage.date ?? t("common.pendingConfirmation")}{stage.owner ? ` · ${text(stage.owner)}` : ""}</small>}
               </span>
               {index < items.length - 1 && <span className="lifecycle-connector">→</span>}
             </li>

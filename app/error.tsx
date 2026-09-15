@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useI18n } from "../components/providers/language-provider";
 
 export default function ErrorPage({
   error,
@@ -9,6 +10,7 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useI18n();
   useEffect(() => {
     console.error("TrimFlow page error", error);
   }, [error]);
@@ -40,9 +42,9 @@ export default function ErrorPage({
         <p style={{ margin: "0 0 8px", color: "#176b94", fontWeight: 700 }}>
           TrimFlow AI
         </p>
-        <h1 style={{ margin: 0, fontSize: 22 }}>页面暂时无法显示</h1>
+        <h1 style={{ margin: 0, fontSize: 22 }}>{t("errors.pageTitle")}</h1>
         <p style={{ margin: "12px 0 20px", lineHeight: 1.7, color: "#6c7d88" }}>
-          页面加载时遇到异常。请重试；如果问题持续存在，请联系系统管理员并提供当前时间。
+          {t("errors.pageCopy")}
         </p>
         <button
           type="button"
@@ -59,7 +61,7 @@ export default function ErrorPage({
             cursor: "pointer",
           }}
         >
-          重新加载页面
+          {t("errors.reloadPage")}
         </button>
       </section>
     </main>

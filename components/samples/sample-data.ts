@@ -1,5 +1,6 @@
 import { clients, contacts, projects, projectRequirements, quotations, samples, sampleVersions, sampleFeedback } from "../../lib/mock-data";
 import type { Project, Sample, SampleFeedback, SampleSpecification, SampleStatus, SampleVersion } from "../../lib/mock-data";
+import type { Language } from "../../lib/i18n";
 
 export type SampleWorkspace = { samples: Sample[]; versions: SampleVersion[]; feedback: SampleFeedback[] };
 export type DevelopmentStatus = "Requested" | "In Development" | "Ready" | "Sent" | "Client Reviewing" | "Revision Required" | "Approved" | "Rejected" | "Closed";
@@ -12,6 +13,7 @@ export const statusLabels: Record<DevelopmentStatus, string> = { Requested: "已
 export const typeLabels: Record<NonNullable<Sample["sampleType"]>, string> = { "Initial Sample": "初样", "Development Sample": "开发样", "Sales Sample": "销售样", "Bulk Approval Sample": "大货确认样" };
 export const categoryLabels = { Color: "颜色", Size: "尺寸", Material: "材质", Logo: "Logo", Function: "功能", Testing: "测试", Quality: "质量", Design: "设计", Cost: "成本", Other: "其他" };
 export const severityLabels = { Blocking: "阻塞", Important: "重要", Minor: "建议" };
+const localized = (language: Language, zh: string, en: string) => language === "zh" ? zh : en;
 
 export const specificationFields = [
   ["product", "产品", "Product"], ["category", "类别", "Category"], ["material", "材质", "Material"],
@@ -83,20 +85,20 @@ export function compareVersions(context: SampleContext) {
     .map((row) => ({ ...row, previous: before[row.key] ?? { value: "", status: "Pending" as const } }));
 }
 
-export function getSampleReadiness(context: SampleContext) {
+export function getSampleReadiness(context: SampleContext, language: Language = "zh") {
   const specs = getSpecification(context);
   const complete = (key: string) => Boolean(specs[key]?.value.trim() && specs[key].status !== "Pending");
   const criteria = [
-    { key: "spec", label: "产品规格 / Product Spec", ready: ["product", "material", "size"].every(complete), reason: "产品、材质和尺寸须确认。" },
-    { key: "color", label: "颜色 / Color", ready: complete("color"), reason: "颜色方向及客户要求的色号须确认。" },
-    { key: "logo", label: "标识 / Logo", ready: complete("logo"), reason: "确认 Logo 要求，或明确记录本样品不需要 Logo。" },
-    { key: "testing", label: "测试 / Testing", ready: complete("testing"), reason: "测试要求须确认，不能以空白视为无要求。" },
-    { key: "approval", label: "客户确认 / Client Approval", ready: context.current?.status === "已确认" || context.current?.reviewOutcome === "Approved", reason: "当前版本尚未获得客户确认。" },
+    { key: "spec", label: localized(language, "产品规格 / Product Spec", "Product Spec"), ready: ["product", "material", "size"].every(complete), reason: localized(language, "产品、材质和尺寸须确认。", "Product, material, and size must be confirmed.") },
+    { key: "color", label: localized(language, "颜色 / Color", "Color"), ready: complete("color"), reason: localized(language, "颜色方向及客户要求的色号须确认。", "The color direction and any client-required color code must be confirmed.") },
+    { key: "logo", label: localized(language, "标识 / Logo", "Logo"), ready: complete("logo"), reason: localized(language, "确认 Logo 要求，或明确记录本样品不需要 Logo。", "Confirm the logo requirement or explicitly record that this sample does not need a logo.") },
+    { key: "testing", label: localized(language, "测试 / Testing", "Testing"), ready: complete("testing"), reason: localized(language, "测试要求须确认，不能以空白视为无要求。", "Testing requirements must be confirmed; a blank field cannot be treated as no requirement.") },
+    { key: "approval", label: localized(language, "客户确认 / Client Approval", "Client Approval"), ready: context.current?.status === "已确认" || context.current?.reviewOutcome === "Approved", reason: localized(language, "当前版本尚未获得客户确认。", "The current version has not received client approval.") },
   ];
   if (specs.pantone?.status === "Pending") criteria[1].ready = false;
   if (specs.weight) criteria[0].ready = criteria[0].ready && complete("weight");
   const open = context.feedback.filter((feedback) => isFeedbackOpen(feedback) && (feedback.severity === "Blocking" || feedback.severity === "Important" || feedback.requiresRevision));
-  if (open.length) criteria.push({ key: "feedback", label: "反馈处理 / Feedback", ready: false, reason: `${open.length} 条影响确认的反馈尚未解决。` });
+  if (open.length) criteria.push({ key: "feedback", label: localized(language, "反馈处理 / Feedback", "Feedback"), ready: false, reason: localized(language, `${open.length} 条影响确认的反馈尚未解决。`, `${open.length} approval-impacting feedback items remain unresolved.`) });
   const specsReady = criteria.filter((item) => item.key !== "approval").every((item) => item.ready);
   const ready = specsReady && criteria.every((item) => item.ready) && !["Rejected", "Closed"].includes(getSampleStatus(context));
   return { criteria, specsReady, ready, reasons: criteria.filter((item) => !item.ready).map((item) => item.reason) };
@@ -113,30 +115,30 @@ export function businessDaysSince(value?: string) {
 
 export type DevelopmentBlocker = { type: "Missing Requirement" | "Client Feedback" | "Technical" | "Factory" | "Testing" | "Timeline" | "Commercial"; severity: "Blocking" | "Important" | "Minor"; reason: string; owner: string; action: string };
 
-export function getDevelopmentBlockers(context: SampleContext): DevelopmentBlocker[] {
-  const owner = context.sample.owner ?? context.project?.owner ?? "待分配";
+export function getDevelopmentBlockers(context: SampleContext, language: Language = "zh"): DevelopmentBlocker[] {
+  const owner = context.sample.owner ?? context.project?.owner ?? localized(language, "待分配", "Unassigned");
   const blockers: DevelopmentBlocker[] = [];
   context.feedback.filter((feedback) => isFeedbackOpen(feedback) && feedback.severity !== "Minor").forEach((feedback) => blockers.push({ type: "Client Feedback", severity: feedback.severity ?? "Important", reason: feedback.summary, owner, action: feedback.requiredAction ?? feedback.details }));
-  const readiness = getSampleReadiness(context);
+  const readiness = getSampleReadiness(context, language);
   const missingSpecs = readiness.criteria.find((item) => item.key === "spec" && !item.ready);
-  if (missingSpecs) blockers.push({ type: "Missing Requirement", severity: "Blocking", reason: "关键产品规格未确认，开发依据尚不完整。", owner, action: missingSpecs.reason });
-  if (readiness.criteria.some((item) => item.key === "testing" && !item.ready)) blockers.push({ type: "Testing", severity: "Important", reason: "当前样品测试要求待确认。", owner, action: "书面确认测试方法和验收标准。" });
-  if (context.sample.targetDate && context.sample.targetDate < DEMO_DATE && !["Approved", "Closed", "Rejected"].includes(getSampleStatus(context))) blockers.push({ type: "Timeline", severity: "Important", reason: `样品目标日期 ${context.sample.targetDate} 已过。`, owner, action: "确认剩余工作和新的完成日期，并同步客户。" });
-  if (context.quotations.some((quote) => quote.targetPrice && quote.targetPrice < quote.unitPrice)) blockers.push({ type: "Commercial", severity: "Minor", reason: "目标价与报价存在差距；不影响样品技术确认。", owner, action: "报价交接时一并讨论数量与费用条件。" });
+  if (missingSpecs) blockers.push({ type: "Missing Requirement", severity: "Blocking", reason: localized(language, "关键产品规格未确认，开发依据尚不完整。", "Critical product specifications are unconfirmed, so the development brief is incomplete."), owner, action: missingSpecs.reason });
+  if (readiness.criteria.some((item) => item.key === "testing" && !item.ready)) blockers.push({ type: "Testing", severity: "Important", reason: localized(language, "当前样品测试要求待确认。", "Testing requirements for this sample remain unconfirmed."), owner, action: localized(language, "书面确认测试方法和验收标准。", "Confirm the test method and acceptance criteria in writing.") });
+  if (context.sample.targetDate && context.sample.targetDate < DEMO_DATE && !["Approved", "Closed", "Rejected"].includes(getSampleStatus(context))) blockers.push({ type: "Timeline", severity: "Important", reason: localized(language, `样品目标日期 ${context.sample.targetDate} 已过。`, `The sample target date of ${context.sample.targetDate} has passed.`), owner, action: localized(language, "确认剩余工作和新的完成日期，并同步客户。", "Confirm the remaining work and revised completion date, then update the client.") });
+  if (context.quotations.some((quote) => quote.targetPrice && quote.targetPrice < quote.unitPrice)) blockers.push({ type: "Commercial", severity: "Minor", reason: localized(language, "目标价与报价存在差距；不影响样品技术确认。", "The target price is below the quotation; this does not block technical sample approval."), owner, action: localized(language, "报价交接时一并讨论数量与费用条件。", "Discuss volume and cost conditions during the quotation handoff.") });
   const priority = { Blocking: 0, Important: 1, Minor: 2 };
   return blockers.sort((a, b) => priority[a.severity] - priority[b.severity]).slice(0, 4);
 }
 
-export function getSampleNextAction(context: SampleContext) {
-  const owner = context.sample.owner ?? context.project?.owner ?? "待分配";
+export function getSampleNextAction(context: SampleContext, language: Language = "zh") {
+  const owner = context.sample.owner ?? context.project?.owner ?? localized(language, "待分配", "Unassigned");
   const feedback = getOpenRevisionFeedback(context).sort((a, b) => (a.severity === "Blocking" ? -1 : 0) - (b.severity === "Blocking" ? -1 : 0))[0];
-  if (feedback) return { action: feedback.requiredAction ?? feedback.summary, why: "客户反馈尚未解决，影响当前版本确认。", owner, timing: feedback.severity === "Blocking" ? "优先处理 / First priority" : "下一轮版本评审前" };
-  if (getSampleStatus(context) === "Client Reviewing" && businessDaysSince(context.current?.sentDate) >= 5) return { action: "跟进客户样品评审", why: "寄出后已超过 5 个工作日，仍无当前版本反馈。", owner, timing: "本次客户联系" };
-  const readiness = getSampleReadiness(context);
-  if (readiness.ready && !context.quotations.length) return { action: "创建报价 / Create Quotation", why: "规格、测试和客户确认已满足报价交接条件。", owner, timing: "本次样品交接" };
-  if (readiness.specsReady && !context.current?.sentDate) return { action: "安排样品寄出", why: "关键规格已确认，寄出后进入客户评审。", owner, timing: context.sample.targetDate ?? "确认寄样日期" };
-  if (getSampleStatus(context) === "Approved") return { action: "将确认样与现有报价对齐", why: "保留确认版本、规格及测试依据，支持报价或订单执行。", owner, timing: "本次商务交接" };
-  return { action: context.sample.nextAction, why: readiness.reasons[0] ?? "推进当前开发节点。", owner, timing: context.sample.targetDate ?? "待确认" };
+  if (feedback) return { action: feedback.requiredAction ?? feedback.summary, why: localized(language, "客户反馈尚未解决，影响当前版本确认。", "Unresolved client feedback is blocking approval of the current version."), owner, timing: feedback.severity === "Blocking" ? localized(language, "优先处理", "First priority") : localized(language, "下一轮版本评审前", "Before the next version review") };
+  if (getSampleStatus(context) === "Client Reviewing" && businessDaysSince(context.current?.sentDate) >= 5) return { action: localized(language, "跟进客户样品评审", "Follow up on client sample review"), why: localized(language, "寄出后已超过 5 个工作日，仍无当前版本反馈。", "More than five business days have passed since dispatch without feedback on the current version."), owner, timing: localized(language, "本次客户联系", "This client contact") };
+  const readiness = getSampleReadiness(context, language);
+  if (readiness.ready && !context.quotations.length) return { action: localized(language, "创建报价", "Create Quotation"), why: localized(language, "规格、测试和客户确认已满足报价交接条件。", "Specifications, testing, and client approval meet the quotation handoff criteria."), owner, timing: localized(language, "本次样品交接", "This sample handoff") };
+  if (readiness.specsReady && !context.current?.sentDate) return { action: localized(language, "安排样品寄出", "Arrange sample dispatch"), why: localized(language, "关键规格已确认，寄出后进入客户评审。", "Critical specifications are confirmed; dispatch will move the sample into client review."), owner, timing: context.sample.targetDate ?? localized(language, "确认寄样日期", "Confirm dispatch date") };
+  if (getSampleStatus(context) === "Approved") return { action: localized(language, "将确认样与现有报价对齐", "Align the approved sample with the current quotation"), why: localized(language, "保留确认版本、规格及测试依据，支持报价或订单执行。", "Preserve the approved version, specifications, and testing basis for quotation or order execution."), owner, timing: localized(language, "本次商务交接", "This commercial handoff") };
+  return { action: context.sample.nextAction, why: readiness.reasons[0] ?? localized(language, "推进当前开发节点。", "Advance the current development milestone."), owner, timing: context.sample.targetDate ?? localized(language, "待确认", "To be confirmed") };
 }
 
 export function feedbackSummary(context: SampleContext) {

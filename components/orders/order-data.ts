@@ -25,6 +25,9 @@ import type {
 } from "../../lib/mock-data";
 import type { QuotationWorkspace } from "../quotations/quotation-data";
 import { DEMO_DATE } from "../samples/sample-data";
+import type { Language } from "../../lib/i18n";
+
+const localize = (language: Language, zh: string, en: string) => language === "zh" ? zh : en;
 
 export type OrderWorkspace = {
   orders: PurchaseOrder[];
@@ -116,23 +119,23 @@ export function getOrderContext(order: PurchaseOrder, workspace: OrderWorkspace,
   };
 }
 
-export function getOrderHealth(context: OrderContext): { status: OrderHealth; reason: string } {
+export function getOrderHealth(context: OrderContext, language: Language = "zh"): { status: OrderHealth; reason: string } {
   const order = context.order;
   const blockingIssue = order.issues?.find((item) => item.blocking && !item.resolved);
   if (blockingIssue) return { status: "Blocked", reason: blockingIssue.issue };
-  if (order.approvals?.some((item) => item.blocking && item.status === "Revision Required")) return { status: "Blocked", reason: "阻塞审批需要修改，当前不能进入 Ready to Ship。" };
+  if (order.approvals?.some((item) => item.blocking && item.status === "Revision Required")) return { status: "Blocked", reason: localize(language, "阻塞审批需要修改，当前不能进入可出货状态。", "A blocking approval requires revision, so the order is not ready to ship.") };
   const overdue = order.productionMilestones?.find((item) => item.status !== "Completed" && item.targetDate < DEMO_DATE);
-  if (overdue) return { status: "At Risk", reason: `${overdue.label} 已超过目标日期 ${overdue.targetDate}。` };
-  const payment = getPaymentRisk(order);
+  if (overdue) return { status: "At Risk", reason: localize(language, `${overdue.label} 已超过目标日期 ${overdue.targetDate}。`, `${overdue.label} is past its target date of ${overdue.targetDate}.`) };
+  const payment = getPaymentRisk(order, language);
   if (payment.level === "At Risk") return { status: "At Risk", reason: payment.reason };
   const deliveryDays = daysUntil(order.deliveryDate);
-  if (deliveryDays <= 7 && getShipmentReadiness(context).status !== "Ready to Ship") return { status: "At Risk", reason: "交付日期在 7 天内，但出货条件尚未满足。" };
+  if (deliveryDays <= 7 && getShipmentReadiness(context, language).status !== "Ready to Ship") return { status: "At Risk", reason: localize(language, "交付日期在 7 天内，但出货条件尚未满足。", "Delivery is due within seven days, but shipment readiness conditions are not met.") };
   const upcoming = order.productionMilestones?.find((item) => item.status !== "Completed" && daysUntil(item.targetDate) >= 0 && daysUntil(item.targetDate) <= 7);
-  if (upcoming || payment.level === "Attention") return { status: "Attention", reason: upcoming ? `${upcoming.label} 将在 7 天内到期。` : payment.reason };
-  return { status: "On Track", reason: "近期关键节点正常，暂无阻塞执行项。" };
+  if (upcoming || payment.level === "Attention") return { status: "Attention", reason: upcoming ? localize(language, `${upcoming.label} 将在 7 天内到期。`, `${upcoming.label} is due within seven days.`) : payment.reason };
+  return { status: "On Track", reason: localize(language, "近期关键节点正常，暂无阻塞执行项。", "Near-term milestones are on track with no execution blockers.") };
 }
 
-export function getShipmentReadiness(context: OrderContext) {
+export function getShipmentReadiness(context: OrderContext, language: Language = "zh") {
   const order = context.order;
   const productionComplete = order.production?.status === "Completed" || (order.production?.progress ?? 0) >= 100;
   const approvalsReady = (order.approvals ?? []).filter((item) => item.blocking).every((item) => ["Approved", "Not Required"].includes(item.status));
@@ -140,57 +143,57 @@ export function getShipmentReadiness(context: OrderContext) {
   const documentsReady = (order.documents ?? []).filter((item) => ["Commercial Invoice", "Packing List", "Test Report"].includes(item.name)).every((item) => ["Available", "Not Required"].includes(item.status));
   const deliveryInstruction = Boolean(context.delivery?.destination || order.shipTo);
   const checks = [
-    { label: "Production Complete", ready: productionComplete, blocking: true },
-    { label: "Bulk / Quality / Testing Approval", ready: approvalsReady, blocking: true },
-    { label: "Packing Complete", ready: packingComplete, blocking: true },
-    { label: "Commercial Documents", ready: documentsReady, blocking: false },
-    { label: "Delivery Instruction", ready: deliveryInstruction, blocking: true },
+    { label: localize(language, "生产完成", "Production Complete"), ready: productionComplete, blocking: true },
+    { label: localize(language, "大货 / 质量 / 测试审批", "Bulk / Quality / Testing Approval"), ready: approvalsReady, blocking: true },
+    { label: localize(language, "包装完成", "Packing Complete"), ready: packingComplete, blocking: true },
+    { label: localize(language, "商务文件", "Commercial Documents"), ready: documentsReady, blocking: false },
+    { label: localize(language, "交付指示", "Delivery Instruction"), ready: deliveryInstruction, blocking: true },
   ];
   const missing = checks.filter((item) => !item.ready);
-  return { status: missing.some((item) => item.blocking) ? "Blocked" : missing.length ? "Needs Attention" : "Ready to Ship", checks, reasons: missing.map((item) => `${item.label} 尚未完成`) } as const;
+  return { status: missing.some((item) => item.blocking) ? "Blocked" : missing.length ? "Needs Attention" : "Ready to Ship", checks, reasons: missing.map((item) => localize(language, `${item.label} 尚未完成`, `${item.label} is incomplete`)) } as const;
 }
 
-export function getPaymentRisk(order: PurchaseOrder) {
+export function getPaymentRisk(order: PurchaseOrder, language: Language = "zh") {
   const paid = order.paidAmount ?? (order.paymentStatus === "已付款" ? order.amount : 0);
-  if (paid >= order.amount || order.paymentStatus === "Paid") return { level: "Normal", reason: "已完成回款，不再显示回款风险。" } as const;
-  if (!order.expectedPaymentDate) return { level: "Attention", reason: "预计回款日期尚未确认。" } as const;
+  if (paid >= order.amount || order.paymentStatus === "Paid") return { level: "Normal", reason: localize(language, "已完成回款，不再显示回款风险。", "Payment is complete, so no collection risk remains.") } as const;
+  if (!order.expectedPaymentDate) return { level: "Attention", reason: localize(language, "预计回款日期尚未确认。", "The expected payment date is not confirmed.") } as const;
   const days = daysUntil(order.expectedPaymentDate);
-  if (days < 0) return { level: "At Risk", reason: `预计回款日已超过 ${Math.abs(days)} 天，仍有未收金额。` } as const;
-  if (days <= 7) return { level: "Attention", reason: `预计回款将在 ${days} 天内到期。` } as const;
-  return { level: "Normal", reason: `预计回款日为 ${order.expectedPaymentDate}。` } as const;
+  if (days < 0) return { level: "At Risk", reason: localize(language, `预计回款日已超过 ${Math.abs(days)} 天，仍有未收金额。`, `The expected payment date is ${Math.abs(days)} days overdue and an amount remains outstanding.`) } as const;
+  if (days <= 7) return { level: "Attention", reason: localize(language, `预计回款将在 ${days} 天内到期。`, `Payment is expected within ${days} days.`) } as const;
+  return { level: "Normal", reason: localize(language, `预计回款日为 ${order.expectedPaymentDate}。`, `The expected payment date is ${order.expectedPaymentDate}.`) } as const;
 }
 
-export function getExecutionRisks(context: OrderContext) {
+export function getExecutionRisks(context: OrderContext, language: Language = "zh") {
   const risks = [...(context.order.issues ?? []).filter((item) => !item.resolved)];
-  const readiness = getShipmentReadiness(context);
-  if (readiness.status === "Blocked" && !risks.some((item) => item.type === "Testing")) risks.push({ id: "derived-readiness", type: "Testing", severity: "Medium", issue: "出货准备条件尚未全部满足。", impact: "Shipment readiness blocked.", owner: "Order Operations", action: readiness.reasons[0] ?? "完成出货准备检查。", blocking: false, resolved: false });
-  const payment = getPaymentRisk(context.order);
-  if (payment.level !== "Normal") risks.push({ id: "derived-payment", type: "Payment", severity: payment.level === "At Risk" ? "High" : "Medium", issue: payment.reason, impact: "可能影响订单安全关闭。", owner: context.order.owner, action: "确认付款计划与到账记录。", blocking: false, resolved: false });
+  const readiness = getShipmentReadiness(context, language);
+  if (readiness.status === "Blocked" && !risks.some((item) => item.type === "Testing")) risks.push({ id: "derived-readiness", type: "Testing", severity: "Medium", issue: localize(language, "出货准备条件尚未全部满足。", "Shipment readiness conditions are incomplete."), impact: localize(language, "出货准备度受到影响。", "Shipment readiness is blocked."), owner: "Order Operations", action: readiness.reasons[0] ?? localize(language, "完成出货准备检查。", "Complete the shipment readiness checks."), blocking: false, resolved: false });
+  const payment = getPaymentRisk(context.order, language);
+  if (payment.level !== "Normal") risks.push({ id: "derived-payment", type: "Payment", severity: payment.level === "At Risk" ? "High" : "Medium", issue: payment.reason, impact: localize(language, "可能影响订单安全关闭。", "This may prevent the order from closing safely."), owner: context.order.owner, action: localize(language, "确认付款计划与到账记录。", "Confirm the payment plan and receipt records."), blocking: false, resolved: false });
   return risks.slice(0, 4);
 }
 
-export function getCriticalPath(context: OrderContext) {
+export function getCriticalPath(context: OrderContext, language: Language = "zh") {
   const order = context.order;
   const nodes = [
-    ...(order.approvals ?? []).filter((item) => item.blocking && item.status !== "Approved" && item.status !== "Not Required").slice(0, 1).map((item) => ({ label: item.type, status: item.status, date: item.date ?? "待完成" })),
+    ...(order.approvals ?? []).filter((item) => item.blocking && item.status !== "Approved" && item.status !== "Not Required").slice(0, 1).map((item) => ({ label: item.type, status: item.status, date: item.date ?? localize(language, "待完成", "Pending") })),
     ...(order.productionMilestones ?? []).filter((item) => item.status !== "Completed" && ["Bulk Completion", "Packing Complete"].includes(item.label)).map((item) => ({ label: item.label, status: item.status, date: item.targetDate })),
-    { label: "Shipment Booking", status: context.shipment?.status === "Pending" ? "Pending" : context.shipment?.status ?? "Pending", date: context.shipment?.etd ?? "待确认" },
+    { label: "Shipment Booking", status: context.shipment?.status === "Pending" ? "Pending" : context.shipment?.status ?? "Pending", date: context.shipment?.etd ?? localize(language, "待确认", "Not confirmed") },
     { label: "Required Delivery", status: context.delivery?.status ?? "Planned", date: order.deliveryDate },
   ];
   return nodes.slice(0, 5);
 }
 
-export function getOrderNextActions(context: OrderContext) {
+export function getOrderNextActions(context: OrderContext, language: Language = "zh") {
   const order = context.order;
   const owner = order.owner;
   const actions: Array<{ action: string; why: string; owner: string; timing: string }> = [];
-  if (!context.contract || !["Confirmed", "Signed"].includes(context.contract.status)) actions.push({ action: "完成合同确认 / Complete Contract", why: "合同尚未确认，生产执行依据不完整。", owner, timing: "开始生产前" });
+  if (!context.contract || !["Confirmed", "Signed"].includes(context.contract.status)) actions.push({ action: localize(language, "完成合同确认", "Complete Contract Confirmation"), why: localize(language, "合同尚未确认，生产执行依据不完整。", "The contract is not confirmed, so the production execution basis is incomplete."), owner, timing: localize(language, "开始生产前", "Before production starts") });
   const currentMilestone = order.productionMilestones?.find((item) => item.status === "Current") ?? order.productionMilestones?.find((item) => item.status === "Pending");
-  if (currentMilestone) actions.push({ action: `推进 ${currentMilestone.label}`, why: `这是当前生产执行节点，依赖：${currentMilestone.dependency ?? "无"}。`, owner: currentMilestone.owner, timing: currentMilestone.targetDate });
+  if (currentMilestone) actions.push({ action: localize(language, `推进 ${currentMilestone.label}`, `Progress ${currentMilestone.label}`), why: localize(language, `这是当前生产执行节点，依赖：${currentMilestone.dependency ?? "无"}。`, `This is the current production milestone. Dependency: ${currentMilestone.dependency ?? "None"}.`), owner: currentMilestone.owner, timing: currentMilestone.targetDate });
   const approval = order.approvals?.find((item) => item.blocking && item.status !== "Approved" && item.status !== "Not Required");
-  if (order.production?.status === "Completed" && approval) actions.push({ action: `完成 ${approval.type}`, why: "阻塞审批未完成，不能进入 Ready to Ship。", owner: approval.owner, timing: "安排出货前" });
-  if (getShipmentReadiness(context).status === "Ready to Ship" && (!context.shipment || context.shipment.status === "Pending")) actions.push({ action: "安排出货 / Arrange Shipment", why: "生产、审批、包装与文件已满足出货条件。", owner: "Order Operations", timing: "立即" });
-  if (context.shipment?.status === "Delivered" && getPaymentRisk(order).level !== "Normal") actions.push({ action: "跟进回款 / Follow Payment", why: "货物已送达，但回款尚未完成。", owner, timing: order.expectedPaymentDate ?? "待确认" });
+  if (order.production?.status === "Completed" && approval) actions.push({ action: localize(language, `完成 ${approval.type}`, `Complete ${approval.type}`), why: localize(language, "阻塞审批未完成，不能进入可出货状态。", "A blocking approval is incomplete, so the order is not ready to ship."), owner: approval.owner, timing: localize(language, "安排出货前", "Before arranging shipment") });
+  if (getShipmentReadiness(context, language).status === "Ready to Ship" && (!context.shipment || context.shipment.status === "Pending")) actions.push({ action: localize(language, "安排出货", "Arrange Shipment"), why: localize(language, "生产、审批、包装与文件已满足出货条件。", "Production, approvals, packaging, and documents meet the shipment conditions."), owner: "Order Operations", timing: localize(language, "立即", "Immediately") });
+  if (context.shipment?.status === "Delivered" && getPaymentRisk(order, language).level !== "Normal") actions.push({ action: localize(language, "跟进回款", "Follow Up on Payment"), why: localize(language, "货物已送达，但回款尚未完成。", "The goods have been delivered, but payment remains incomplete."), owner, timing: order.expectedPaymentDate ?? localize(language, "待确认", "Not confirmed") });
   return actions.slice(0, 3);
 }
 
@@ -201,18 +204,18 @@ export function canCompleteOrder(context: OrderContext) {
   return delivered && paid && !blocking;
 }
 
-export function getLifecycle(context: OrderContext) {
+export function getLifecycle(context: OrderContext, language: Language = "zh") {
   const order = context.order;
   const orderIndex = lifecycleOrder.indexOf(order.currentStage);
   return lifecycleOrder.map((stage, index) => {
-    const blocked = index === orderIndex && getOrderHealth(context).status === "Blocked";
-    return { stage, status: blocked ? "Blocked" : index < orderIndex || order.currentStage === "Completed" ? "Completed" : index === orderIndex ? "Current" : "Pending", owner: lifecycleOwner(stage, context), targetDate: lifecycleDate(stage, context), actualDate: lifecycleActual(stage, context), dependency: lifecycleDependency(stage) } as const;
+    const blocked = index === orderIndex && getOrderHealth(context, language).status === "Blocked";
+    return { stage, status: blocked ? "Blocked" : index < orderIndex || order.currentStage === "Completed" ? "Completed" : index === orderIndex ? "Current" : "Pending", owner: lifecycleOwner(stage, context), targetDate: lifecycleDate(stage, context, language), actualDate: lifecycleActual(stage, context), dependency: lifecycleDependency(stage) } as const;
   });
 }
 
 const lifecycleOrder: OrderStage[] = ["PO Received", "Contract", "Production", "Approval", "Delivery", "Shipment", "Payment", "Completed"];
 function lifecycleOwner(stage: OrderStage, context: OrderContext) { return ["Production", "Approval"].includes(stage) ? "Order Operations" : stage === "Shipment" || stage === "Delivery" ? "Logistics" : context.order.owner; }
-function lifecycleDate(stage: OrderStage, context: OrderContext) { if (stage === "PO Received") return context.order.poDate; if (stage === "Contract") return context.contract?.createdDate ?? "待确认"; if (stage === "Production") return context.order.production?.targetCompletion ?? "待确认"; if (stage === "Approval") return context.order.production?.targetCompletion ?? "待确认"; if (stage === "Delivery") return context.delivery?.plannedDate ?? context.order.deliveryDate; if (stage === "Shipment") return context.shipment?.etd ?? "待确认"; if (stage === "Payment") return context.order.expectedPaymentDate ?? "待确认"; return "待完成"; }
+function lifecycleDate(stage: OrderStage, context: OrderContext, language: Language) { const pending = localize(language, "待确认", "Not confirmed"); if (stage === "PO Received") return context.order.poDate; if (stage === "Contract") return context.contract?.createdDate ?? pending; if (stage === "Production") return context.order.production?.targetCompletion ?? pending; if (stage === "Approval") return context.order.production?.targetCompletion ?? pending; if (stage === "Delivery") return context.delivery?.plannedDate ?? context.order.deliveryDate; if (stage === "Shipment") return context.shipment?.etd ?? pending; if (stage === "Payment") return context.order.expectedPaymentDate ?? pending; return localize(language, "待完成", "Pending"); }
 function lifecycleActual(stage: OrderStage, context: OrderContext) { if (stage === "PO Received") return context.order.poDate; if (stage === "Contract") return context.contract?.confirmedAt; if (stage === "Production" && context.order.production?.status === "Completed") return context.order.production.targetCompletion; if (stage === "Delivery") return context.delivery?.actualDate; if (stage === "Shipment") return context.shipment?.departedDate; if (stage === "Payment" && getPaymentRisk(context.order).level === "Normal") return DEMO_DATE; return undefined; }
 function lifecycleDependency(stage: OrderStage) { const dependencies: Record<OrderStage, string> = { "PO Received": "Accepted Quote", Contract: "PO Received", Production: "Contract Confirmed", Approval: "Bulk Production", Delivery: "Approval + Packing", Shipment: "Ready to Ship", Payment: "Payment Term", Completed: "Delivered + Paid" }; return dependencies[stage]; }
 

@@ -20,19 +20,11 @@ import type { SampleWorkspace } from "../samples/sample-data";
 import type { InterfaceLanguage } from "../layout/workspace-shell";
 import type { QuotationWorkspace } from "../quotations/quotation-data";
 import type { OrderWorkspace } from "../orders/order-data";
+import { useI18n } from "../providers/language-provider";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
-const tabs: Array<{ id: TabId; label: string; labelEn: string }> = [
-  { id: "overview", label: "项目概览", labelEn: "Overview" },
-  { id: "requirements", label: "产品需求", labelEn: "Requirements" },
-  { id: "samples", label: "样品", labelEn: "Samples" },
-  { id: "quotations", label: "报价", labelEn: "Quotations" },
-  { id: "communications", label: "沟通记录", labelEn: "Communications" },
-  { id: "orders", label: "订单", labelEn: "Orders" },
-  { id: "timeline", label: "时间线", labelEn: "Timeline" },
-  { id: "ai", label: "AI Copilot", labelEn: "AI Copilot" },
-];
+const tabs: TabId[] = ["overview", "requirements", "samples", "quotations", "communications", "orders", "timeline", "ai"];
 
 type ProjectCommandCenterProps = {
   project: Project;
@@ -53,6 +45,7 @@ type ProjectCommandCenterProps = {
 };
 
 export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+  const { language: appLanguage, t, text } = useI18n();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
   const data = useMemo(() => {
@@ -64,68 +57,73 @@ export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, s
     return { ...base, samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id), purchaseOrders: projectOrders, orderLines: orderWorkspace.lines.filter((item) => orderIds.has(item.purchaseOrderId)), contracts: orderWorkspace.contracts.filter((item) => item.projectId === project.id), deliveries: orderWorkspace.deliveries.filter((item) => item.projectId === project.id), shipments: orderWorkspace.shipments.filter((item) => item.projectId === project.id) };
   }, [orderWorkspace, project, quotationWorkspace, sampleWorkspace]);
   const [localEvents, setLocalEvents] = useState<TimelineEvent[]>(data.timeline);
-  const priority = getOpportunityPriority(data);
-  const opportunity = getCommercialOpportunity(data);
+  const priority = getOpportunityPriority(data, appLanguage);
+  const opportunity = getCommercialOpportunity(data, appLanguage);
 
   const addActivity = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const type = String(form.get("type")) as TimelineEvent["type"];
     const content = String(form.get("content"));
-    const newEvent: TimelineEvent = { id: `local-${Date.now()}`, projectId: project.id, clientId: project.clientId, type, occurredAt: new Date().toISOString(), displayDate: "刚刚", title: String(form.get("title")) || "新增项目活动", description: content, icon: type === "sample" ? "◈" : type === "quotation" ? "¥" : type === "task" ? "✓" : "✉" };
+    const newEvent: TimelineEvent = { id: `local-${Date.now()}`, projectId: project.id, clientId: project.clientId, type, occurredAt: new Date().toISOString(), displayDate: appLanguage === "zh" ? "刚刚" : "Just now", title: String(form.get("title")) || (appLanguage === "zh" ? "新增项目活动" : "New project activity"), description: content, icon: type === "sample" ? "◈" : type === "quotation" ? "¥" : type === "task" ? "✓" : "✉" };
     setLocalEvents((current) => [newEvent, ...current]);
     setActivityModal(false);
-    showToast("项目活动已添加（模拟）");
+    showToast(appLanguage === "zh" ? "项目活动已添加（模拟）" : "Project activity added (demo)");
   };
 
   return (
     <div className="project-command-center">
-      <ProjectHeader data={data} priority={priority} expectedValue={opportunity.estimatedValue} stages={stages} onBack={onBack} onUpdateStage={onUpdateStage} onAddActivity={() => setActivityModal(true)} onCreateSample={() => { setTab("samples"); showToast("已打开项目样品；选择样品可创建后续版本"); }} onCreateQuote={() => { setTab("quotations"); if (data.quotations.length) showToast("已打开项目报价；点击记录进入谈判工作区"); else onCreateQuotation(); }} onEditProject={() => showToast("编辑项目为当前原型模拟操作")} />
+      <ProjectHeader data={data} priority={priority} expectedValue={opportunity.estimatedValue} stages={stages} onBack={onBack} onUpdateStage={onUpdateStage} onAddActivity={() => setActivityModal(true)} onCreateSample={() => { setTab("samples"); showToast(appLanguage === "zh" ? "已打开项目样品；选择样品可创建后续版本" : "Project samples opened; select a sample to create a revision"); }} onCreateQuote={() => { setTab("quotations"); if (data.quotations.length) showToast(appLanguage === "zh" ? "已打开项目报价；点击记录进入谈判工作区" : "Project quotations opened; select a record to enter negotiation"); else onCreateQuotation(); }} onEditProject={() => showToast(appLanguage === "zh" ? "编辑项目为当前原型模拟操作" : "Edit project is a demo action")} />
 
       <Card className="project-lifecycle-card">
-        <div className="lifecycle-card-head"><div><span>Lifecycle Control</span><strong>项目生命周期控制</strong></div><StatusBadge status={project.lifecycleStage} /></div>
-        <LifecycleStepper currentStage={project.lifecycleStage} milestones={getLifecycleMilestones(data)} />
-        <p className="current-stage-summary"><span>Current Stage Summary</span>{getStageSummary(data)}</p>
+        <div className="lifecycle-card-head"><div><span>Lifecycle Control</span><strong>{t("project.lifecycleControl")}</strong></div><StatusBadge status={project.lifecycleStage} /></div>
+        <LifecycleStepper currentStage={project.lifecycleStage} milestones={getLifecycleMilestones(data, appLanguage)} />
+        <p className="current-stage-summary"><span>{t("project.stageSummary")}</span>{text(getStageSummary(data, appLanguage))}</p>
       </Card>
 
-      <div className="project-command-tabs" role="tablist" aria-label="项目详情">
-        {tabs.map((item) => <button key={item.id} role="tab" aria-selected={tab === item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><strong>{item.label}</strong><span>{item.labelEn}</span>{item.id === "requirements" && data.requirements.some((requirement) => requirement.status !== "已确认") && <b>{data.requirements.filter((requirement) => requirement.status !== "已确认").length}</b>}</button>)}
+      <div className="project-command-tabs" role="tablist" aria-label={t("project.commandCenter")}>
+        {tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><strong>{t(`project.tabs.${item}`)}</strong>{item === "requirements" && data.requirements.some((requirement) => requirement.status !== "已确认") && <b>{data.requirements.filter((requirement) => requirement.status !== "已确认").length}</b>}</button>)}
       </div>
 
       {tab === "overview" && <ProjectOverview data={data} events={localEvents} onViewTimeline={() => setTab("timeline")} />}
       {tab === "requirements" && <RequirementsPanel data={data} />}
-      {tab === "samples" && <Card className="sample-workspace sample-list-panel"><div className="sample-section-head"><div><h2>项目样品 / Project Samples</h2><p>{project.code} · 点击样品进入开发工作区</p></div><Badge>Demo Workspace</Badge></div><SampleList rows={data.samples.map((sample) => getSampleContext(sample, sampleWorkspace, [project]))} onOpenSample={onOpenSample} language={language} /></Card>}
+      {tab === "samples" && <Card className="sample-workspace sample-list-panel"><div className="sample-section-head"><div><h2>{t("project.samples.title")}</h2><p>{project.code} · {t("project.samples.subtitle")}</p></div><Badge>{t("common.demoWorkspace")}</Badge></div><SampleList rows={data.samples.map((sample) => getSampleContext(sample, sampleWorkspace, [project]))} onOpenSample={onOpenSample} language={language} /></Card>}
       {tab === "quotations" && <QuotationsPanel data={data} onOpen={onOpenQuotation} onCreate={onCreateQuotation} />}
       {tab === "communications" && <CommunicationsPanel data={data} onAdd={() => setActivityModal(true)} />}
       {tab === "orders" && <OrdersPanel data={data} onOpenOrder={onOpenOrder} />}
       {tab === "timeline" && <TimelinePanel events={localEvents} />}
       {tab === "ai" && aiCopilot}
 
-      {activityModal && <Modal title="添加项目活动" onClose={() => setActivityModal(false)}><form className="modal-form" onSubmit={addActivity}><div className="form-row"><label>活动类型 / Activity Type<select name="type"><option value="communication">客户沟通</option><option value="sample">样品进展</option><option value="quotation">报价进展</option><option value="task">内部任务</option></select></label><label>活动标题 / Title<input name="title" required placeholder="例如：收到客户价格反馈" /></label></div><label>活动内容 / Activity Notes<textarea name="content" required rows={5} placeholder="记录事实、客户信号与后续影响..." /></label><div className="modal-actions"><Button type="button" variant="ghost" onClick={() => setActivityModal(false)}>取消</Button><Button type="submit">保存活动</Button></div></form></Modal>}
+      {activityModal && <Modal title={appLanguage === "zh" ? "添加项目活动" : "Add Project Activity"} onClose={() => setActivityModal(false)}><form className="modal-form" onSubmit={addActivity}><div className="form-row"><label>{appLanguage === "zh" ? "活动类型" : "Activity Type"}<select name="type"><option value="communication">{appLanguage === "zh" ? "客户沟通" : "Client Communication"}</option><option value="sample">{appLanguage === "zh" ? "样品进展" : "Sample Progress"}</option><option value="quotation">{appLanguage === "zh" ? "报价进展" : "Quotation Progress"}</option><option value="task">{appLanguage === "zh" ? "内部任务" : "Internal Task"}</option></select></label><label>{appLanguage === "zh" ? "活动标题" : "Activity Title"}<input name="title" required placeholder={appLanguage === "zh" ? "例如：收到客户价格反馈" : "Example: Received client price feedback"} /></label></div><label>{appLanguage === "zh" ? "活动内容" : "Activity Notes"}<textarea name="content" required rows={5} placeholder={appLanguage === "zh" ? "记录事实、客户信号与后续影响..." : "Record facts, client signals, and downstream impact..."} /></label><div className="modal-actions"><Button type="button" variant="ghost" onClick={() => setActivityModal(false)}>{t("actions.cancel")}</Button><Button type="submit">{t("actions.save")}</Button></div></form></Modal>}
     </div>
   );
 }
 
 function RequirementsPanel({ data }: { data: ReturnType<typeof getProjectCommandData> }) {
+  const { t, label, text } = useI18n();
   const confirmed = data.requirements.filter((item) => item.status === "已确认").length;
   const completeness = data.requirements.length ? Math.round(confirmed / data.requirements.length * 100) : 0;
-  return <Card className="table-card command-tab-panel"><div className="compact-section-head"><div><h2>结构化产品需求</h2><p>Requirements · 当前项目专属资料</p></div><Badge tone="blue">{completeness}% 完整</Badge></div><div className="table-wrap"><table><thead><tr><th>产品 / Product</th><th>业务字段 / Business Field</th><th>当前值 / Current Value</th><th>状态 / Status</th><th>来源 / Source</th></tr></thead><tbody>{data.requirements.map((item) => <tr key={item.id}><td>{item.product}</td><td><strong>{item.field} / {item.fieldEn}</strong></td><td>{item.value}</td><td><Badge tone={item.status === "已确认" ? "green" : item.status === "有冲突" ? "red" : "amber"}>{item.status}</Badge></td><td>{item.source}</td></tr>)}{data.requirements.length === 0 && <tr><td colSpan={5}>当前项目材料中尚未确认产品需求。</td></tr>}</tbody></table></div></Card>;
+  return <Card className="table-card command-tab-panel"><div className="compact-section-head"><div><h2>{t("project.requirements.title")}</h2><p>{t("project.requirements.subtitle")}</p></div><Badge tone="blue">{t("project.requirements.completeness", { percent: completeness })}</Badge></div><div className="table-wrap"><table><thead><tr><th>{t("common.product")}</th><th>{t("common.field")}</th><th>{t("common.value")}</th><th>{t("common.status")}</th><th>{t("common.source")}</th></tr></thead><tbody>{data.requirements.map((item) => <tr key={item.id}><td>{text(item.product)}</td><td><strong>{label(item.field)}</strong></td><td>{text(item.value)}</td><td><Badge tone={item.status === "已确认" ? "green" : item.status === "有冲突" ? "red" : "amber"}>{label(item.status)}</Badge></td><td>{text(item.source)}</td></tr>)}{data.requirements.length === 0 && <tr><td colSpan={5}>{t("common.notConfirmed")}</td></tr>}</tbody></table></div></Card>;
 }
 
 function QuotationsPanel({ data, onOpen, onCreate }: { data: ReturnType<typeof getProjectCommandData>; onOpen: (id: string) => void; onCreate: () => void }) {
-  return <div className="command-entity-grid">{data.quotations.map((quote) => <Card className="entity-summary-card" key={quote.id}><div className="entity-card-head"><div><span>{quote.id}</span><h2>Quotation {quote.version}</h2></div><StatusBadge status={quote.status} /></div><strong className="entity-price">{quote.unitPrice ? `${quote.currency} ${quote.unitPrice}` : "待填写 / Pending"} <small>/ {quote.unit}</small></strong><dl><div><dt>Quantity</dt><dd>{quote.quantity ? quote.quantity.toLocaleString("en-US") : "尚未确认"}</dd></div><div><dt>Target Price</dt><dd>{quote.targetPrice ? `${quote.currency} ${quote.targetPrice}` : "尚未确认"}</dd></div><div><dt>Valid Until</dt><dd>{quote.validUntil || "尚未确认"}</dd></div><div><dt>Client Feedback</dt><dd>{quote.clientFeedback}</dd></div></dl><Button variant="secondary" onClick={() => onOpen(quote.id)}>查看报价与谈判 →</Button></Card>)}{data.quotations.length === 0 && <Card className="command-empty"><p>当前项目尚无正式报价。</p><Button onClick={onCreate}>从确认样创建报价 / Create from Approved Sample</Button></Card>}</div>;
+  const { t, label, text, formatDate } = useI18n();
+  return <div className="command-entity-grid">{data.quotations.map((quote) => <Card className="entity-summary-card" key={quote.id}><div className="entity-card-head"><div><span>{quote.id}</span><h2>Quotation {quote.version}</h2></div><StatusBadge status={quote.status} /></div><strong className="entity-price">{quote.unitPrice ? `${quote.currency} ${quote.unitPrice}` : t("common.notConfirmed")} <small>/ {label(quote.unit)}</small></strong><dl><div><dt>{t("common.quantity")}</dt><dd>{quote.quantity ? quote.quantity.toLocaleString("en-US") : t("common.notConfirmed")}</dd></div><div><dt>{t("quotation.targetPrice")}</dt><dd>{quote.targetPrice ? `${quote.currency} ${quote.targetPrice}` : t("common.notConfirmed")}</dd></div><div><dt>{t("common.validUntil")}</dt><dd>{quote.validUntil ? formatDate(quote.validUntil) : t("common.notConfirmed")}</dd></div><div><dt>{t("quotation.clientFeedback")}</dt><dd>{text(quote.clientFeedback)}</dd></div></dl><Button variant="secondary" onClick={() => onOpen(quote.id)}>{t("actions.openWorkspace")} →</Button></Card>)}{data.quotations.length === 0 && <Card className="command-empty"><p>{t("project.quotations.empty")}</p><Button onClick={onCreate}>{t("project.quotations.createFromSample")}</Button></Card>}</div>;
 }
 
 function CommunicationsPanel({ data, onAdd }: { data: ReturnType<typeof getProjectCommandData>; onAdd: () => void }) {
-  return <Card className="command-tab-panel"><div className="compact-section-head"><div><h2>沟通记录</h2><p>Communications · 客户信号与内部协作</p></div><Button onClick={onAdd}>＋ 添加活动</Button></div><div className="project-communications">{[...data.communications].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).map((item) => <article key={item.id}><div><Badge>{item.type}</Badge><span>{new Date(item.occurredAt).toLocaleDateString("zh-CN")}</span></div><strong>{item.subject}</strong><p>{item.content}</p><small>{item.author} · {item.language}</small></article>)}{data.communications.length === 0 && <p className="command-empty">当前项目尚无沟通记录。</p>}</div></Card>;
+  const { t, label, text, formatDate } = useI18n();
+  return <Card className="command-tab-panel"><div className="compact-section-head"><div><h2>{t("project.communications.title")}</h2><p>{t("project.communications.subtitle")}</p></div><Button onClick={onAdd}>＋ {t("project.addActivity")}</Button></div><div className="project-communications">{[...data.communications].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).map((item) => <article key={item.id}><div><Badge>{label(item.type)}</Badge><span>{formatDate(item.occurredAt)}</span></div><strong>{text(item.subject)}</strong><p>{text(item.content)}</p><small>{item.author} · {label(item.language)}</small></article>)}{data.communications.length === 0 && <p className="command-empty">{t("project.communications.empty")}</p>}</div></Card>;
 }
 
 function OrdersPanel({ data, onOpenOrder }: { data: ReturnType<typeof getProjectCommandData>; onOpenOrder: (id: string) => void }) {
+  const { t, label, formatDate } = useI18n();
   const po = data.purchaseOrders[0];
-  if (!po) return <Card className="command-empty command-tab-panel">当前项目尚未创建 Purchase Order。</Card>;
-  return <Card className="command-tab-panel order-flow-panel"><div className="compact-section-head"><div><h2>{po.poNumber}</h2><p>PO → Contract → Production → Approval → Delivery → Shipment → Payment</p></div><StatusBadge status={po.currentStage} /></div><div className="order-flow"><div><span>PO</span><strong>{po.currency} {po.amount.toLocaleString("en-US")}</strong><small>{po.poDate}</small></div><div><span>Contract</span><strong>{data.contracts[0]?.status ?? "Pending"}</strong><small>{data.contracts[0]?.contractNumber ?? "尚未确认"}</small></div><div><span>Production</span><strong>{po.production?.status ?? "Not Started"}</strong><small>{po.production?.progress ?? 0}%</small></div><div><span>Delivery</span><strong>{data.deliveries[0]?.status ?? "Pending"}</strong><small>{data.deliveries[0]?.plannedDate ?? po.deliveryDate}</small></div><div><span>Shipment</span><strong>{data.shipments[0]?.status ?? "Pending"}</strong><small>{data.shipments[0]?.etd ?? "尚未确认"}</small></div></div><Button onClick={() => onOpenOrder(po.id)}>进入订单执行工作区 →</Button></Card>;
+  if (!po) return <Card className="command-empty command-tab-panel">{t("project.orders.empty")}</Card>;
+  return <Card className="command-tab-panel order-flow-panel"><div className="compact-section-head"><div><h2>{po.poNumber}</h2><p>PO → Contract → Production → Approval → Delivery → Shipment → Payment</p></div><StatusBadge status={po.currentStage} /></div><div className="order-flow"><div><span>PO</span><strong>{po.currency} {po.amount.toLocaleString("en-US")}</strong><small>{formatDate(po.poDate)}</small></div><div><span>Contract</span><strong>{label(data.contracts[0]?.status ?? "Pending")}</strong><small>{data.contracts[0]?.contractNumber ?? t("common.notConfirmed")}</small></div><div><span>Production</span><strong>{label(po.production?.status ?? "Not Started")}</strong><small>{po.production?.progress ?? 0}%</small></div><div><span>Delivery</span><strong>{label(data.deliveries[0]?.status ?? "Pending")}</strong><small>{formatDate(data.deliveries[0]?.plannedDate ?? po.deliveryDate)}</small></div><div><span>Shipment</span><strong>{label(data.shipments[0]?.status ?? "Pending")}</strong><small>{data.shipments[0]?.etd ? formatDate(data.shipments[0].etd) : t("common.notConfirmed")}</small></div></div><Button onClick={() => onOpenOrder(po.id)}>{t("actions.openWorkspace")} →</Button></Card>;
 }
 
 function TimelinePanel({ events }: { events: TimelineEvent[] }) {
-  return <Card className="command-tab-panel"><div className="compact-section-head"><div><h2>项目完整时间线</h2><p>Timeline · 从询盘到当前业务节点</p></div><span>{events.length} 条</span></div><div className="full-project-timeline">{events.map((event) => <article key={event.id}><span className="activity-glyph">{event.icon}</span><div><span>{event.displayDate} · {event.type}</span><strong>{event.title}</strong><p>{event.description}</p></div></article>)}</div></Card>;
+  const { t, label, text, formatDate } = useI18n();
+  return <Card className="command-tab-panel"><div className="compact-section-head"><div><h2>{t("project.timeline.title")}</h2><p>{t("project.timeline.subtitle")}</p></div><span>{t("common.count", { count: events.length })}</span></div><div className="full-project-timeline">{events.map((event) => <article key={event.id}><span className="activity-glyph">{event.icon}</span><div><span>{formatDate(event.occurredAt)} · {label(event.type)}</span><strong>{text(event.title)}</strong><p>{text(event.description)}</p></div></article>)}</div></Card>;
 }

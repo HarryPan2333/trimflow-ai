@@ -1,5 +1,8 @@
 "use client";
 
+import type { Language, TranslationKey } from "../../lib/i18n";
+import { useI18n } from "../providers/language-provider";
+
 export type WorkspaceView =
   | "dashboard"
   | "clients"
@@ -14,27 +17,28 @@ export type WorkspaceView =
   | "templates"
   | "settings";
 
-export type InterfaceLanguage = "中文" | "English";
+export type InterfaceLanguage = Language;
 
 export const workspaceNavigation: Array<{
   id: WorkspaceView;
   label: string;
   en: string;
   icon: string;
+  key: TranslationKey;
   placement: "primary" | "bottom";
 }> = [
-  { id: "dashboard", label: "工作台", en: "Workspace", icon: "⌂", placement: "primary" },
-  { id: "clients", label: "客户与品牌", en: "Clients & Brands", icon: "◎", placement: "primary" },
-  { id: "projects", label: "销售项目", en: "Sales Projects", icon: "▦", placement: "primary" },
-  { id: "samples", label: "样品中心", en: "Sample Center", icon: "◈", placement: "primary" },
-  { id: "quotations", label: "报价中心", en: "Quotation Center", icon: "¥", placement: "primary" },
-  { id: "orders", label: "订单中心", en: "Order Center", icon: "▤", placement: "primary" },
-  { id: "fulfillment", label: "交付与出货", en: "Delivery & Shipment", icon: "↗", placement: "primary" },
-  { id: "todos", label: "待办事项", en: "Tasks", icon: "✓", placement: "primary" },
-  { id: "reports", label: "周报中心", en: "Weekly Reports", icon: "▥", placement: "primary" },
-  { id: "ai", label: "AI 助手", en: "AI Assistant", icon: "✦", placement: "primary" },
-  { id: "templates", label: "模板中心", en: "Templates", icon: "▧", placement: "bottom" },
-  { id: "settings", label: "设置", en: "Settings", icon: "⚙", placement: "bottom" },
+  { id: "dashboard", key: "nav.dashboard", label: "工作台", en: "Workspace", icon: "⌂", placement: "primary" },
+  { id: "clients", key: "nav.clients", label: "客户与品牌", en: "Clients & Brands", icon: "◎", placement: "primary" },
+  { id: "projects", key: "nav.projects", label: "销售项目", en: "Sales Projects", icon: "▦", placement: "primary" },
+  { id: "samples", key: "nav.samples", label: "样品中心", en: "Sample Center", icon: "◈", placement: "primary" },
+  { id: "quotations", key: "nav.quotations", label: "报价中心", en: "Quotation Center", icon: "¥", placement: "primary" },
+  { id: "orders", key: "nav.orders", label: "订单中心", en: "Order Center", icon: "▤", placement: "primary" },
+  { id: "fulfillment", key: "nav.fulfillment", label: "交付与出货", en: "Delivery & Shipment", icon: "↗", placement: "primary" },
+  { id: "todos", key: "nav.todos", label: "待办事项", en: "Tasks", icon: "✓", placement: "primary" },
+  { id: "reports", key: "nav.reports", label: "周报中心", en: "Weekly Reports", icon: "▥", placement: "primary" },
+  { id: "ai", key: "nav.ai", label: "AI 助手", en: "AI Assistant", icon: "✦", placement: "primary" },
+  { id: "templates", key: "nav.templates", label: "模板中心", en: "Templates", icon: "▧", placement: "bottom" },
+  { id: "settings", key: "nav.settings", label: "设置", en: "Settings", icon: "⚙", placement: "bottom" },
 ];
 
 type AppSidebarProps = {
@@ -45,6 +49,7 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({ activeView, language, todoCount, onNavigate }: AppSidebarProps) {
+  const { t, text } = useI18n();
   const primaryItems = workspaceNavigation.filter((item) => item.placement === "primary");
   const bottomItems = workspaceNavigation.filter((item) => item.placement === "bottom");
 
@@ -55,7 +60,7 @@ export function AppSidebar({ activeView, language, todoCount, onNavigate }: AppS
       onClick={() => onNavigate(item.id)}
     >
       <span className="nav-icon">{item.icon}</span>
-      <span>{language === "中文" ? item.label : item.en}</span>
+      <span>{t(item.key)}</span>
       {item.id === "todos" && <b>{todoCount}</b>}
     </button>
   );
@@ -66,14 +71,14 @@ export function AppSidebar({ activeView, language, todoCount, onNavigate }: AppS
         <span className="brand-mark">T</span>
         <span>
           <strong>TrimFlow AI</strong>
-          <small>服装辅料外贸销售助手</small>
+          <small>{language === "zh" ? "服装辅料外贸销售助手" : "AI Trim Export Sales Assistant"}</small>
         </span>
       </button>
       <div className="workspace-select">
         <span className="client-avatar small-avatar">TF</span>
         <div>
-          <strong>TrimFlow 外贸团队</strong>
-          <small>销售工作区</small>
+          <strong>{t("sidebar.team")}</strong>
+          <small>{t("sidebar.salesWorkspace")}</small>
         </div>
         <span>⌄</span>
       </div>
@@ -81,12 +86,12 @@ export function AppSidebar({ activeView, language, todoCount, onNavigate }: AppS
       <div className="sidebar-spacer" />
       <nav className="bottom-nav">{bottomItems.map(renderItem)}</nav>
       <div className="user-card">
-        <span className="user-avatar">陈</span>
+        <span className="user-avatar">{language === "zh" ? "陈" : "CC"}</span>
         <div>
-          <strong>陈晨</strong>
-          <small>外贸销售经理</small>
+          <strong>{text("陈晨")}</strong>
+          <small>{t("sidebar.role")}</small>
         </div>
-        <button aria-label="打开用户菜单">⋯</button>
+        <button aria-label={language === "zh" ? "打开用户菜单" : "Open user menu"}>⋯</button>
       </div>
     </aside>
   );

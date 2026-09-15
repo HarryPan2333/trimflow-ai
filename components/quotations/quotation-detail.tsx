@@ -6,6 +6,7 @@ import { StatusBadge } from "../business/status-badge";
 import { Badge, Button, Modal } from "../ui/primitives";
 import type { QuotationAction, QuotationContext } from "./quotation-data";
 import { createRevision, effectiveStatus, formatMoney, getNegotiationHealth } from "./quotation-data";
+import { useI18n } from "../providers/language-provider";
 import {
   CommercialLevers,
   CommercialSummary,
@@ -20,7 +21,7 @@ import {
 
 type ModalKind = "edit" | "revision" | null;
 
-export function QuotationDetail({ context, language, dispatch, onBack, onProject, onSample, onOpenVersion, onCreatePO, showToast }: {
+export function QuotationDetail({ context, dispatch, onBack, onProject, onSample, onOpenVersion, onCreatePO, showToast }: {
   context: QuotationContext;
   language: InterfaceLanguage;
   dispatch: Dispatch<QuotationAction>;
@@ -33,8 +34,8 @@ export function QuotationDetail({ context, language, dispatch, onBack, onProject
 }) {
   const [modal, setModal] = useState<ModalKind>(null);
   const quote = context.quotation;
-  const health = getNegotiationHealth(quote);
-  const isEn = language === "English";
+  const { language: interfaceLanguage, t, label, text, formatDate } = useI18n();
+  const health = getNegotiationHealth(quote, interfaceLanguage);
   const updateStatus = (status: "Sent" | "Accepted" | "Rejected") => {
     dispatch({
       type: "update",
@@ -56,14 +57,14 @@ export function QuotationDetail({ context, language, dispatch, onBack, onProject
         nextMove: status === "Accepted" ? "PO handoff" : "客户跟进",
       },
     });
-    showToast(isEn ? `Quotation marked ${status}` : `报价已更新为 ${status}`);
+    showToast(t("quotation.statusUpdated", { status: label(status) }));
   };
   const submitEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     dispatch({ type: "update", id: quote.id, changes: { unitPrice: Number(form.get("unitPrice")), moq: Number(form.get("moq")), leadTime: String(form.get("leadTime")), validUntil: String(form.get("validUntil")), nextAction: String(form.get("nextAction")) } });
     setModal(null);
-    showToast("草稿已更新 · Demo Workspace");
+    showToast(t("quotation.draftUpdated"));
   };
   const submitRevision = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,31 +73,31 @@ export function QuotationDetail({ context, language, dispatch, onBack, onProject
     dispatch({ type: "create", ...revision });
     setModal(null);
     onOpenVersion(revision.quotation.id);
-    showToast(`${revision.quotation.version} 报价版本已创建 · Demo Workspace`);
+    showToast(t("quotation.createRevisionSuccess", { version: revision.quotation.version }));
   };
 
   return <div className="quotation-workspace quote-detail">
-    <button className="back-link" onClick={onBack}>‹ 返回报价中心 / Back to Quotations</button>
+    <button className="back-link" onClick={onBack}>‹ {t("quotation.back")}</button>
     <header className="quote-header">
       <div className="quote-header-main">
-        <span className="eyebrow">QUOTATION COMMAND RECORD</span>
+        <span className="eyebrow">{t("quotation.commandRecord")}</span>
         <div className="quote-title-row"><h1>{quote.id}</h1><StatusBadge status={effectiveStatus(quote)} /><Badge tone={health.level === "high" ? "red" : health.level === "medium" ? "amber" : "green"}>{health.label}</Badge></div>
-        <p>{context.client?.name} · <button onClick={onProject}>{context.project?.code} / {context.project?.name}</button> · {quote.product}</p>
-        <div className="quote-reference-links"><button onClick={onProject}>Project →</button>{quote.approvedSampleId && <button onClick={() => onSample(quote.approvedSampleId!)}>Approved Sample {quote.approvedSampleId} →</button>}</div>
+        <p>{text(context.client?.name ?? t("order.anonymousClient"))} · <button onClick={onProject}>{context.project?.code} / {text(context.project?.name ?? "")}</button> · {text(quote.product)}</p>
+        <div className="quote-reference-links"><button onClick={onProject}>{t("common.project")} →</button>{quote.approvedSampleId && <button onClick={() => onSample(quote.approvedSampleId!)}>{label("Approved")} {t("common.product")} {quote.approvedSampleId} →</button>}</div>
       </div>
       <div className="quote-header-actions">
-        {quote.status === "Draft" && <Button variant="secondary" onClick={() => setModal("edit")}>编辑草稿 / Edit</Button>}
-        {!["Accepted", "Rejected"].includes(quote.status) && <Button variant="secondary" onClick={() => setModal("revision")}>创建版本 / New Revision</Button>}
-        {["Draft", "Internal Review"].includes(quote.status) && <Button onClick={() => updateStatus("Sent")}>标记已发送 / Mark Sent</Button>}
-        {["Sent", "Negotiating"].includes(quote.status) && <><Button variant="secondary" onClick={() => updateStatus("Rejected")}>拒绝 / Reject</Button><Button onClick={() => updateStatus("Accepted")}>接受 / Accept</Button></>}
-        {effectiveStatus(quote) === "Accepted" && <Button onClick={onCreatePO}>创建 PO / Create PO</Button>}
+        {quote.status === "Draft" && <Button variant="secondary" onClick={() => setModal("edit")}>{t("quotation.editDraft")}</Button>}
+        {!["Accepted", "Rejected"].includes(quote.status) && <Button variant="secondary" onClick={() => setModal("revision")}>{t("quotation.newRevision")}</Button>}
+        {["Draft", "Internal Review"].includes(quote.status) && <Button onClick={() => updateStatus("Sent")}>{t("quotation.markSent")}</Button>}
+        {["Sent", "Negotiating"].includes(quote.status) && <><Button variant="secondary" onClick={() => updateStatus("Rejected")}>{t("quotation.reject")}</Button><Button onClick={() => updateStatus("Accepted")}>{t("quotation.accept")}</Button></>}
+        {effectiveStatus(quote) === "Accepted" && <Button onClick={onCreatePO}>{t("quotation.createPO")}</Button>}
       </div>
     </header>
 
     <div className="quote-summary-band">
       {[
-        ["Client", context.client?.name ?? "匿名客户"], ["Product", quote.product], ["Version", quote.version],
-        ["Owner", quote.owner ?? context.project?.owner ?? "待分配"], ["Created", quote.createdAt ?? quote.issuedAt], ["Valid Until", quote.validUntil || "待确认"],
+        [t("common.client"), text(context.client?.name ?? t("order.anonymousClient"))], [t("common.product"), text(quote.product)], [t("common.version"), quote.version],
+        [t("common.owner"), text(quote.owner ?? context.project?.owner ?? t("common.notAssigned"))], [t("quotation.created"), formatDate(quote.createdAt ?? quote.issuedAt)], [t("common.validUntil"), quote.validUntil ? formatDate(quote.validUntil) : t("common.notConfirmed")],
       ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
     </div>
 
@@ -113,13 +114,14 @@ export function QuotationDetail({ context, language, dispatch, onBack, onProject
       </main>
       <aside className="quote-side-column"><QuoteSidebar context={context} onCreatePO={onCreatePO} /></aside>
     </div>
-    <p className="quote-prototype-note">Demo Workspace · 当前操作仅在本次会话生效，刷新后恢复模拟数据。价格、客户、报价与谈判内容均为虚构或脱敏数据。</p>
+    <p className="quote-prototype-note">{t("quotation.demoNotice")}</p>
 
-    {modal === "edit" && <Modal title="编辑报价草稿 / Edit Draft" onClose={() => setModal(null)}><QuoteForm quote={quote} submitLabel="保存草稿 / Save Draft" onSubmit={submitEdit} onClose={() => setModal(null)} /></Modal>}
-    {modal === "revision" && <Modal title="创建报价版本 / Create Revision" onClose={() => setModal(null)}><QuoteForm quote={quote} revision submitLabel="创建版本 / Create Revision" onSubmit={submitRevision} onClose={() => setModal(null)} /></Modal>}
+    {modal === "edit" && <Modal title={t("quotation.editDraft")} onClose={() => setModal(null)}><QuoteForm quote={quote} submitLabel={t("quotation.saveDraft")} onSubmit={submitEdit} onClose={() => setModal(null)} /></Modal>}
+    {modal === "revision" && <Modal title={t("quotation.newRevision")} onClose={() => setModal(null)}><QuoteForm quote={quote} revision submitLabel={t("quotation.newRevision")} onSubmit={submitRevision} onClose={() => setModal(null)} /></Modal>}
   </div>;
 }
 
 function QuoteForm({ quote, revision = false, submitLabel, onSubmit, onClose }: { quote: QuotationContext["quotation"]; revision?: boolean; submitLabel: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onClose: () => void }) {
-  return <form className="modal-form quote-modal-form" onSubmit={onSubmit}><p className="sample-form-note">仅记录明确的商务条件。不要填写内部成本、毛利或未经确认的客户要求。</p><div className="form-row"><label>单价 / Unit Price<input name="unitPrice" type="number" min="0" step="0.01" required defaultValue={quote.unitPrice || ""} /></label><label>起订量 / MOQ<input name="moq" type="number" min="0" step="1" required defaultValue={quote.moq || ""} /></label></div><div className="form-row"><label>交期 / Lead Time<input name="leadTime" required defaultValue={quote.leadTime} placeholder="例如：28 days" /></label><label>有效期 / Valid Until<input name="validUntil" type="date" required defaultValue={quote.validUntil} /></label></div>{revision ? <label>修改原因 / Reason for Revision<textarea name="reason" rows={3} required defaultValue={quote.clientFeedback} /></label> : <label>下一步行动 / Next Action<textarea name="nextAction" rows={2} required defaultValue={quote.nextAction} /></label>}<div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>取消 / Cancel</Button><Button type="submit">{submitLabel}</Button></div></form>;
+  const { t } = useI18n();
+  return <form className="modal-form quote-modal-form" onSubmit={onSubmit}><p className="sample-form-note">{t("quotation.formHelp")}</p><div className="form-row"><label>{t("common.unitPrice")}<input name="unitPrice" type="number" min="0" step="0.01" required defaultValue={quote.unitPrice || ""} /></label><label>MOQ<input name="moq" type="number" min="0" step="1" required defaultValue={quote.moq || ""} /></label></div><div className="form-row"><label>{t("common.leadTime")}<input name="leadTime" required defaultValue={quote.leadTime} placeholder="28 days" /></label><label>{t("common.validUntil")}<input name="validUntil" type="date" required defaultValue={quote.validUntil} /></label></div>{revision ? <label>{t("quotation.reasonForRevision")}<textarea name="reason" rows={3} required defaultValue={quote.clientFeedback} /></label> : <label>{t("common.nextAction")}<textarea name="nextAction" rows={2} required defaultValue={quote.nextAction} /></label>}<div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button><Button type="submit">{submitLabel}</Button></div></form>;
 }

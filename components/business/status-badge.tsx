@@ -1,4 +1,7 @@
+"use client";
+
 import { Badge } from "../ui/primitives";
+import { useI18n } from "../providers/language-provider";
 
 const toneByStatus: Record<string, string> = {
   inquiry: "blue",
@@ -27,6 +30,7 @@ const toneByStatus: Record<string, string> = {
 };
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const { label: localize } = useI18n();
   const tone = toneByStatus[status] ?? toneByStatus[status.toLowerCase()] ?? "neutral";
-  return <Badge tone={tone}>{label ?? status}</Badge>;
+  return <Badge tone={tone}>{label ?? localize(status)}</Badge>;
 }

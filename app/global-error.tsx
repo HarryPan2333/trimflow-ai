@@ -12,9 +12,10 @@ export default function GlobalError({
   useEffect(() => {
     console.error("TrimFlow global error", error);
   }, [error]);
+  const isEnglish = typeof window !== "undefined" && window.localStorage.getItem("trimflow-language") === "en";
 
   return (
-    <html lang="zh-CN">
+    <html lang={isEnglish ? "en" : "zh-CN"}>
       <body
         style={{
           margin: 0,
@@ -30,9 +31,9 @@ export default function GlobalError({
         }}
       >
         <main role="alert" style={{ width: "min(100%, 520px)" }}>
-          <h1 style={{ margin: 0, fontSize: 22 }}>TrimFlow AI 加载失败</h1>
+          <h1 style={{ margin: 0, fontSize: 22 }}>{isEnglish ? "TrimFlow AI Failed to Load" : "TrimFlow AI 加载失败"}</h1>
           <p style={{ margin: "12px 0 20px", lineHeight: 1.7, color: "#6c7d88" }}>
-            应用遇到意外错误。请检查网络连接后重试。
+            {isEnglish ? "The application encountered an unexpected error. Check your network connection and try again." : "应用遇到意外错误。请检查网络连接后重试。"}
           </p>
           <button
             type="button"
@@ -49,7 +50,7 @@ export default function GlobalError({
               cursor: "pointer",
             }}
           >
-            重新加载
+            {isEnglish ? "Reload" : "重新加载"}
           </button>
         </main>
       </body>

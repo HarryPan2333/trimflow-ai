@@ -1,6 +1,7 @@
 "use client";
 
 import type { DashboardKpi, SecondaryIndicator } from "./dashboard-data";
+import { useI18n } from "../providers/language-provider";
 
 type ExecutiveOverviewProps = {
   kpis: DashboardKpi[];
@@ -9,32 +10,33 @@ type ExecutiveOverviewProps = {
 };
 
 export function ExecutiveOverview({ kpis, indicators, onNavigate }: ExecutiveOverviewProps) {
+  const { language, t, text } = useI18n();
   return (
     <section aria-labelledby="executive-overview-title">
       <div className="command-section-title">
         <div>
-          <h2 id="executive-overview-title">经营概览</h2>
-          <p>Executive Overview · 关键销售节点实时汇总</p>
+          <h2 id="executive-overview-title">{t("dashboard.executiveOverview")}</h2>
+          <p>{t("dashboard.executiveSubtitle")}</p>
         </div>
-        <span>基于当前 Mock Data 计算</span>
+        <span>{t("dashboard.mockCalculated")}</span>
       </div>
       <div className="executive-kpis">
         {kpis.map((kpi) => (
           <button className="command-kpi" key={kpi.id} onClick={() => onNavigate(kpi.target)}>
-            <span className="kpi-label">{kpi.label}<small>{kpi.labelEn}</small></span>
+            <span className="kpi-label">{language === "zh" ? kpi.label : kpi.labelEn}{language === "zh" && <small>{kpi.labelEn}</small>}</span>
             <strong>{kpi.value}</strong>
-            <span className="kpi-trend">{kpi.trend}</span>
-            <span className="kpi-detail">{kpi.detail}</span>
-            <span className="kpi-link">查看相关业务 →</span>
+            <span className="kpi-trend">{text(kpi.trend)}</span>
+            <span className="kpi-detail">{text(kpi.detail)}</span>
+            <span className="kpi-link">{t("actions.view")} →</span>
           </button>
         ))}
       </div>
-      <div className="secondary-indicators" aria-label="补充经营指标">
+      <div className="secondary-indicators" aria-label={t("dashboard.additionalMetrics")}>
         {indicators.map((indicator) => (
           <div key={indicator.label}>
-            <span>{indicator.label}</span>
+            <span>{text(indicator.label)}</span>
             <strong>{indicator.value}</strong>
-            <small>{indicator.detail}</small>
+            <small>{text(indicator.detail)}</small>
           </div>
         ))}
       </div>

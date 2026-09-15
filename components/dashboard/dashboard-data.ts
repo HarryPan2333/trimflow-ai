@@ -13,6 +13,7 @@ import type {
   Task,
   TimelineEvent,
 } from "../../lib/mock-data";
+import { localizeNarrative, type Language } from "../../lib/i18n";
 
 export type DashboardData = {
   projects: Project[];
@@ -87,7 +88,7 @@ export function getDashboardReferenceTime(data: DashboardData) {
   );
 }
 
-function activityDelta(data: DashboardData, types: TimelineEvent["type"][]) {
+function activityDelta(data: DashboardData, types: TimelineEvent["type"][], language: Language) {
   const reference = getDashboardReferenceTime(data);
   const currentStart = reference - 14 * DAY;
   const previousStart = reference - 28 * DAY;
@@ -100,10 +101,11 @@ function activityDelta(data: DashboardData, types: TimelineEvent["type"][]) {
     return types.includes(event.type) && time > previousStart && time <= currentStart;
   }).length;
   const delta = current - previous;
-  return delta === 0 ? "与上周期持平" : `较上周期 ${delta > 0 ? "+" : ""}${delta}`;
+  if (delta === 0) return language === "zh" ? "与上周期持平" : "Unchanged from prior period";
+  return language === "zh" ? `较上周期 ${delta > 0 ? "+" : ""}${delta}` : `${delta > 0 ? "+" : ""}${delta} vs. prior period`;
 }
 
-export function getDashboardKpis(data: DashboardData): DashboardKpi[] {
+export function getDashboardKpis(data: DashboardData, language: Language): DashboardKpi[] {
   const activeProjects = data.projects.filter((project) => project.stage !== "暂停或流失");
   const samplesInProgress = data.samples.filter(
     (sample) => !["已确认", "已关闭", "已完成"].includes(sample.status),
@@ -117,8 +119,8 @@ export function getDashboardKpis(data: DashboardData): DashboardKpi[] {
       label: "活跃机会",
       labelEn: "Active Opportunities",
       value: activeProjects.length,
-      trend: activityDelta(data, ["inquiry", "requirement"]),
-      detail: `${new Set(activeProjects.map((project) => project.clientId)).size} 个客户正在推进`,
+      trend: activityDelta(data, ["inquiry", "requirement"], language),
+      detail: language === "zh" ? `${new Set(activeProjects.map((project) => project.clientId)).size} 个客户正在推进` : `${new Set(activeProjects.map((project) => project.clientId)).size} clients in progress`,
       target: "projects",
     },
     {
@@ -126,8 +128,8 @@ export function getDashboardKpis(data: DashboardData): DashboardKpi[] {
       label: "打样中",
       labelEn: "Samples in Progress",
       value: samplesInProgress.length,
-      trend: activityDelta(data, ["sample"]),
-      detail: `${new Set(samplesInProgress.map((sample) => sample.projectId)).size} 个项目需要样品动作`,
+      trend: activityDelta(data, ["sample"], language),
+      detail: language === "zh" ? `${new Set(samplesInProgress.map((sample) => sample.projectId)).size} 个项目需要样品动作` : `${new Set(samplesInProgress.map((sample) => sample.projectId)).size} projects need sample actions`,
       target: "samples",
     },
     {
@@ -135,8 +137,8 @@ export function getDashboardKpis(data: DashboardData): DashboardKpi[] {
       label: "报价谈判中",
       labelEn: "Quotes in Negotiation",
       value: quotesNegotiating.length,
-      trend: activityDelta(data, ["quotation", "negotiation"]),
-      detail: `${new Set(quotesNegotiating.map((quotation) => quotation.clientId)).size} 个客户等待价格收口`,
+      trend: activityDelta(data, ["quotation", "negotiation"], language),
+      detail: language === "zh" ? `${new Set(quotesNegotiating.map((quotation) => quotation.clientId)).size} 个客户等待价格收口` : `${new Set(quotesNegotiating.map((quotation) => quotation.clientId)).size} clients awaiting price closure`,
       target: "quotations",
     },
     {
@@ -144,14 +146,14 @@ export function getDashboardKpis(data: DashboardData): DashboardKpi[] {
       label: "执行中订单",
       labelEn: "Orders in Execution",
       value: activeOrders.length,
-      trend: activityDelta(data, ["po", "contract", "delivery", "shipment"]),
-      detail: `${activeOrders.filter((order) => order.health !== "风险").length} 个订单状态可控`,
+      trend: activityDelta(data, ["po", "contract", "delivery", "shipment"], language),
+      detail: language === "zh" ? `${activeOrders.filter((order) => order.health !== "风险").length} 个订单状态可控` : `${activeOrders.filter((order) => order.health !== "风险").length} orders on track`,
       target: "orders",
     },
   ];
 }
 
-export function getSecondaryIndicators(data: DashboardData): SecondaryIndicator[] {
+export function getSecondaryIndicators(data: DashboardData, language: Language): SecondaryIndicator[] {
   const reference = getDashboardReferenceTime(data);
   const weekStart = new Date(reference);
   const day = weekStart.getUTCDay() || 7;
@@ -176,17 +178,14 @@ export function getSecondaryIndicators(data: DashboardData): SecondaryIndicator[
     return task.status !== "已完成" && due >= weekStart.getTime() && due < weekEnd;
   });
 
-  return [
-    { label: "待客户确认", value: pendingProjects.size, detail: "需求或规格待确认" },
-    { label: "超过 48h 未跟进", value: staleClients.length, detail: "需要恢复客户节奏" },
-    { label: "即将到期报价", value: expiringQuotes.length, detail: "30 天内到期" },
-    { label: "本周待办", value: weekTasks.length, detail: "未完成任务" },
-    { label: "已收到 PO", value: data.purchaseOrders.length, detail: "正式订单" },
-    { label: "待出货", value: data.shipments.filter((shipment) => shipment.status !== "Delivered").length, detail: "计划或执行中" },
+  return language === "zh" ? [
+    { label: "待客户确认", value: pendingProjects.size, detail: "需求或规格待确认" }, { label: "超过 48h 未跟进", value: staleClients.length, detail: "需要恢复客户节奏" }, { label: "即将到期报价", value: expiringQuotes.length, detail: "30 天内到期" }, { label: "本周待办", value: weekTasks.length, detail: "未完成任务" }, { label: "已收到 PO", value: data.purchaseOrders.length, detail: "正式订单" }, { label: "待出货", value: data.shipments.filter((shipment) => shipment.status !== "Delivered").length, detail: "计划或执行中" },
+  ] : [
+    { label: "Awaiting Client", value: pendingProjects.size, detail: "Requirements or specifications pending" }, { label: "No Follow-up for 48h", value: staleClients.length, detail: "Client cadence needs attention" }, { label: "Quotes Expiring Soon", value: expiringQuotes.length, detail: "Expire within 30 days" }, { label: "Tasks This Week", value: weekTasks.length, detail: "Open tasks" }, { label: "POs Received", value: data.purchaseOrders.length, detail: "Formal purchase orders" }, { label: "Awaiting Shipment", value: data.shipments.filter((shipment) => shipment.status !== "Delivered").length, detail: "Planned or in progress" },
   ];
 }
 
-export function getTodayFocus(data: DashboardData): FocusItem[] {
+export function getTodayFocus(data: DashboardData, language: Language): FocusItem[] {
   const reference = getDashboardReferenceTime(data);
   const projectById = new Map(data.projects.map((project) => [project.id, project]));
   const clientById = new Map(data.clients.map((client) => [client.id, client]));
@@ -204,9 +203,9 @@ export function getTodayFocus(data: DashboardData): FocusItem[] {
         priority: "高",
         client: project.customer,
         project,
-        issue: `${task.title}已逾期`,
-        reason: `截止日期为 ${task.dueDate}，当前状态仍为${task.status}。`,
-        action: project.next,
+        issue: language === "zh" ? `${task.title}已逾期` : `${localizeNarrative(task.title, language)} is overdue`,
+        reason: language === "zh" ? `截止日期为 ${task.dueDate}，当前状态仍为${task.status}。` : `Due ${task.dueDate}; the task remains ${localizeNarrative(task.status, language)}.`,
+        action: localizeNarrative(project.next, language),
       });
     });
 
@@ -222,9 +221,9 @@ export function getTodayFocus(data: DashboardData): FocusItem[] {
         priority: "高",
         client: client.name,
         project,
-        issue: `已 ${days} 天没有新的客户沟通`,
-        reason: "跟进节奏中断可能影响当前开发节点。",
-        action: project.next,
+        issue: language === "zh" ? `已 ${days} 天没有新的客户沟通` : `No new client communication for ${days} days`,
+        reason: language === "zh" ? "跟进节奏中断可能影响当前开发节点。" : "A break in follow-up cadence may affect the current development milestone.",
+        action: localizeNarrative(project.next, language),
       });
     });
 
@@ -240,9 +239,9 @@ export function getTodayFocus(data: DashboardData): FocusItem[] {
         priority: "中",
         client: client.name,
         project,
-        issue: `${sample.id} 正等待客户确认`,
-        reason: sample.feedbackStatus,
-        action: sample.nextAction,
+        issue: language === "zh" ? `${sample.id} 正等待客户确认` : `${sample.id} is awaiting client confirmation`,
+        reason: language === "zh" ? sample.feedbackStatus : "Client review or feedback is still pending.",
+        action: localizeNarrative(sample.nextAction, language),
       });
     });
 
@@ -261,9 +260,9 @@ export function getTodayFocus(data: DashboardData): FocusItem[] {
         priority: days <= 7 ? "高" : "中",
         client: project.customer,
         project,
-        issue: `${quotation.id} 将在 ${days} 天后失效`,
-        reason: "报价仍在谈判中，失效前需要确认客户下一步。",
-        action: "确认客户是否接受当前方案，或需要延长报价有效期。",
+        issue: language === "zh" ? `${quotation.id} 将在 ${days} 天后失效` : `${quotation.id} expires in ${days} days`,
+        reason: language === "zh" ? "报价仍在谈判中，失效前需要确认客户下一步。" : "The quotation is still under negotiation; confirm the client's next step before expiry.",
+        action: language === "zh" ? "确认客户是否接受当前方案，或需要延长报价有效期。" : "Confirm whether the client accepts the current proposal or needs an extension.",
       });
     });
 
@@ -281,9 +280,9 @@ export function getTodayFocus(data: DashboardData): FocusItem[] {
         priority: "普通",
         client: project.customer,
         project,
-        issue: `${shipment.id} 接近计划出货节点`,
-        reason: `当前状态为 ${shipment.status}，ETD 为 ${shipment.etd ?? "待确认"}。`,
-        action: "确认交付准备和出货资料是否齐全。",
+        issue: language === "zh" ? `${shipment.id} 接近计划出货节点` : `${shipment.id} is approaching its planned shipment milestone`,
+        reason: language === "zh" ? `当前状态为 ${shipment.status}，ETD 为 ${shipment.etd ?? "待确认"}。` : `Current status: ${shipment.status}; ETD: ${shipment.etd ?? "not confirmed"}.`,
+        action: language === "zh" ? "确认交付准备和出货资料是否齐全。" : "Confirm delivery readiness and shipment documentation.",
       });
     });
 

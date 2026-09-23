@@ -73,7 +73,7 @@ export function effectiveStatus(quote: Quotation): QuotationStatus {
 
 export function getQuotationContext(quotation: Quotation, workspace: QuotationWorkspace, allProjects: Project[] = projects): QuotationContext {
   const versions = workspace.quotations
-    .filter((item) => item.projectId === quotation.projectId && item.product === quotation.product)
+    .filter((item) => item.projectId === quotation.projectId && (quotation.quotationSeriesId ? item.quotationSeriesId === quotation.quotationSeriesId : item.product === quotation.product))
     .sort((a, b) => versionNumber(a.version) - versionNumber(b.version));
   return {
     quotation,
@@ -221,7 +221,7 @@ export function getVersionChanges(current: Quotation, previous?: Quotation) {
 
 export function createDraftFromSample(context: SampleContext, workspace: QuotationWorkspace) {
   const existing = workspace.quotations
-    .filter((item) => item.projectId === context.sample.projectId && item.product === context.sample.product)
+    .filter((item) => item.projectId === context.sample.projectId && (context.sample.productId ? item.lineItems?.some((line) => line.productId === context.sample.productId && line.variantId === context.sample.variantId) : item.product === context.sample.product))
     .sort((a, b) => versionNumber(b.version) - versionNumber(a.version))[0];
   if (existing) return { existing } as const;
   const code = context.project?.code ?? `P${context.sample.projectId}`;
@@ -234,13 +234,13 @@ export function createDraftFromSample(context: SampleContext, workspace: Quotati
   const currency = context.client?.currency ?? "USD";
   const approved = getSampleReadiness(context).ready;
   const quotation: Quotation = {
-    id, clientId: context.sample.clientId, projectId: context.sample.projectId, version: "V1", product: context.sample.product,
+    id, clientId: context.sample.clientId, projectId: context.sample.projectId, version: "V1", quotationSeriesId: `series-${context.sample.id}`, product: context.sample.product,
     quantity, unit: "pcs", unitPrice: 0, currency, status: "Draft", validUntil: "", issuedAt: DEMO_DATE,
     moq, incoterm: "待确认 / Not confirmed", clientFeedback: "尚未收到正式报价反馈。", approvedSampleId: approved ? context.sample.id : undefined,
     createdAt: DEMO_DATE, owner: context.sample.owner ?? context.project?.owner, paymentTerm: context.client?.paymentTerm,
     testingRequirement: find("testing"), materialFinish: [find("material"), find("finish")].filter(Boolean).join(" · "),
     nextAction: "补充价格、有效期与商务条件后完成内部复核", commercialPosition: "Balanced", additionalFee: 0,
-    lineItems: [{ id: `${id}-LINE-01`, quotationId: id, product: context.sample.product, specification: specs.filter((item) => ["material", "size", "color", "finish", "testing"].includes(item.key) && item.value).map((item) => item.value).join(" · "), quantity, unit: "pcs", unitPrice: 0, amount: 0, currency }],
+    lineItems: [{ id: `${id}-LINE-01`, quotationId: id, product: context.sample.product, specification: specs.filter((item) => ["material", "size", "color", "finish", "testing"].includes(item.key) && item.value).map((item) => item.value).join(" · "), quantity, unit: "pcs", unitPrice: 0, amount: 0, currency, productId: context.sample.productId, variantId: context.sample.variantId, designRevisionId: context.current?.sourceDesignRevisionId, sampleVersionId: context.current?.id, configurationSnapshot: context.current?.configurationSnapshot ? structuredClone(context.current.configurationSnapshot) : undefined }],
   };
   return { quotation, tiers: [] as QuotationTier[] } as const;
 }

@@ -135,6 +135,8 @@ export type Sample = {
   clientId: string;
   projectId: number;
   product: string;
+  productId?: string;
+  variantId?: string;
   currentVersionId: string;
   currentVersion: string;
   status: SampleStatus;
@@ -195,6 +197,8 @@ export type SampleVersion = {
   internalNote?: string;
   revisionFeedbackIds?: string[];
   reviewOutcome?: "Approved" | "Rejected";
+  sourceDesignRevisionId?: string;
+  configurationSnapshot?: import("../product-library/types").ProductConfigurationSnapshot;
 };
 
 export type SampleFeedback = {
@@ -225,6 +229,11 @@ export type QuotationLineItem = {
   unitPrice: number;
   amount: number;
   currency: "USD" | "EUR" | "CNY";
+  productId?: string;
+  variantId?: string;
+  designRevisionId?: string;
+  sampleVersionId?: string;
+  configurationSnapshot?: import("../product-library/types").ProductConfigurationSnapshot;
 };
 
 export type Quotation = {
@@ -232,6 +241,7 @@ export type Quotation = {
   clientId: string;
   projectId: number;
   version: string;
+  quotationSeriesId?: string;
   product: string;
   quantity: number;
   unit: string;
@@ -388,6 +398,12 @@ export type OrderLine = {
   unit: string;
   unitPrice: number;
   amount: number;
+  productId?: string;
+  variantId?: string;
+  designRevisionId?: string;
+  sampleVersionId?: string;
+  quotationLineItemId?: string;
+  configurationSnapshot?: import("../product-library/types").ProductConfigurationSnapshot;
 };
 
 export type Communication = {

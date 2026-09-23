@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { StatusBadge } from "../business/status-badge";
 import { Badge, Card } from "../ui/primitives";
 import { useI18n } from "../providers/language-provider";
+import { getSoldSpecification } from "../../lib/product-library/integration";
 import {
   effectiveStatus, formatMoney, getCommercialLevers, getGapRows, getNextActions,
   getQuotationRisks, getReadiness, getStrategy, getVersionChanges, priceGap,
@@ -32,7 +33,7 @@ export function LineItems({ context }: { context: QuotationContext }) {
   const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
   const total = subtotal + (quote.additionalFee ?? 0);
   return <QuoteSection index="01" title={t("quotation.lineItems")} subtitle={t("quotation.lineItemsHelp")}>
-    <div className="quote-inner-scroll"><table className="quote-detail-table"><thead><tr><th>{t("common.product")}</th><th>{t("common.specification")}</th><th>{t("common.quantity")}</th><th>{t("common.unitPrice")}</th><th>{t("common.amount")}</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><strong>{text(item.product)}</strong></td><td>{text(item.specification || "按确认样 / As approved sample")}</td><td>{item.quantity ? `${item.quantity.toLocaleString("en-US")} ${label(item.unit)}` : t("common.notConfirmed")}</td><td>{formatMoney(item.unitPrice, item.currency, 2, language)}</td><td>{formatMoney(item.amount, item.currency, 2, language)}</td></tr>)}{items.length === 0 && <tr><td colSpan={5}>{t("quotation.noLineItems")}</td></tr>}</tbody></table></div>
+    <div className="quote-inner-scroll"><table className="quote-detail-table"><thead><tr><th>{t("common.product")}</th><th>{t("common.specification")}</th><th>{t("common.quantity")}</th><th>{t("common.unitPrice")}</th><th>{t("common.amount")}</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><strong>{text(item.configurationSnapshot?.productName ?? item.product)}</strong></td><td>{text(getSoldSpecification(item.configurationSnapshot) ?? (item.specification || "按确认样 / As approved sample"))}</td><td>{item.quantity ? `${item.quantity.toLocaleString("en-US")} ${label(item.unit)}` : t("common.notConfirmed")}</td><td>{formatMoney(item.unitPrice, item.currency, 2, language)}</td><td>{formatMoney(item.amount, item.currency, 2, language)}</td></tr>)}{items.length === 0 && <tr><td colSpan={5}>{t("quotation.noLineItems")}</td></tr>}</tbody></table></div>
     <dl className="quote-totals"><div><dt>{t("quotation.subtotal")}</dt><dd>{formatMoney(subtotal, quote.currency, 2, language)}</dd></div><div><dt>{t("quotation.additionalFee")}</dt><dd>{quote.additionalFee ? formatMoney(quote.additionalFee, quote.currency, 2, language) : t("quotation.none")}</dd></div><div><dt>{t("common.total")}</dt><dd>{formatMoney(total, quote.currency, 2, language)}</dd></div></dl>
   </QuoteSection>;
 }

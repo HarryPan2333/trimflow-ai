@@ -21,6 +21,8 @@ import type { InterfaceLanguage } from "../layout/workspace-shell";
 import type { QuotationWorkspace } from "../quotations/quotation-data";
 import type { OrderWorkspace } from "../orders/order-data";
 import { useI18n } from "../providers/language-provider";
+import type { ProductLibraryData } from "../../lib/product-library/types";
+import { getProjectProducts, getProductById } from "../../lib/product-library/selectors";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
@@ -36,6 +38,9 @@ type ProjectCommandCenterProps = {
   sampleWorkspace: SampleWorkspace;
   quotationWorkspace: QuotationWorkspace;
   orderWorkspace: OrderWorkspace;
+  productLibrary: ProductLibraryData;
+  onBrowseProducts: () => void;
+  onOpenProduct: (id: string) => void;
   onOpenSample: (id: string) => void;
   onOpenQuotation: (id: string) => void;
   onCreateQuotation: () => void;
@@ -44,7 +49,7 @@ type ProjectCommandCenterProps = {
   initialTab?: "overview" | "samples" | "quotations" | "orders";
 };
 
-export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
   const { language: appLanguage, t, text } = useI18n();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
@@ -80,6 +85,8 @@ export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, s
         <LifecycleStepper currentStage={project.lifecycleStage} milestones={getLifecycleMilestones(data, appLanguage)} />
         <p className="current-stage-summary"><span>{t("project.stageSummary")}</span>{text(getStageSummary(data, appLanguage))}</p>
       </Card>
+
+      <Card className="project-product-section"><div className="project-product-section-head"><div><h2>{t("product.projectProducts")}</h2><p>{t("product.projectBrowse")}</p></div><Button variant="secondary" onClick={onBrowseProducts}>{t("product.browse")} →</Button></div><div className="project-product-list">{getProjectProducts(productLibrary, project.id).map((relation) => { const linked = getProductById(productLibrary, relation.productId); return linked && <button className="project-product-link" key={relation.id} onClick={() => onOpenProduct(linked.id)}><strong>{text(linked.name)}</strong><span>{relation.variantId ? productLibrary.variants.find((item) => item.id === relation.variantId)?.variantCode : t("product.familyLevel")}</span><Badge>{t(`product.${relation.proposalStatus}`)}</Badge></button>; })}{!getProjectProducts(productLibrary, project.id).length && <p>{t("product.noProjectProducts")}</p>}</div></Card>
 
       <div className="project-command-tabs" role="tablist" aria-label={t("project.commandCenter")}>
         {tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><strong>{t(`project.tabs.${item}`)}</strong>{item === "requirements" && data.requirements.some((requirement) => requirement.status !== "已确认") && <b>{data.requirements.filter((requirement) => requirement.status !== "已确认").length}</b>}</button>)}

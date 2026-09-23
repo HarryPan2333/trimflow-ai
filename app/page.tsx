@@ -3,6 +3,7 @@
 import "../components/samples/sample-workspace.css";
 import "../components/quotations/quotation-workspace.css";
 import "../components/orders/order-workspace.css";
+import "../components/products/product-workspace.css";
 import "../components/theme/steep-editorial.css";
 
 import { useMemo, useReducer, useState, useSyncExternalStore } from "react";
@@ -25,6 +26,13 @@ import { createDraftFromSample, createQuotationWorkspace, getQuotationContext, q
 import type { QuotationWorkspace } from "../components/quotations/quotation-data";
 import { OrderCenter } from "../components/orders/order-center";
 import { OrderDetail } from "../components/orders/order-detail";
+import { ProductLibrary } from "../components/products/product-library";
+import { ProductDetail as ProductLibraryDetail } from "../components/products/product-detail";
+import { AddProductToProjectDialog } from "../components/products/add-product-to-project-dialog";
+import { mockProductLibraryRepository } from "../lib/product-library/repository";
+import { addProductToProject } from "../lib/product-library/integration";
+import { getProductById, getVariantsForProduct } from "../lib/product-library/selectors";
+import type { ProductLibraryData } from "../lib/product-library/types";
 import { createOrderFromQuote, createOrderWorkspace, getOrderContext, orderWorkspaceReducer } from "../components/orders/order-data";
 import type { OrderWorkspace } from "../components/orders/order-data";
 import { Badge, Button, Card, Modal } from "../components/ui/primitives";
@@ -39,7 +47,7 @@ import type { Project, ProjectStage as Stage } from "../lib/mock-data";
 import type { LocalizedText } from "../lib/i18n";
 
 type OutputLanguage = "中文" | "英文" | "中英对照";
-type View = WorkspaceView | "detail" | "sample-detail" | "quotation-detail" | "order-detail";
+type View = WorkspaceView | "detail" | "product-detail" | "sample-detail" | "quotation-detail" | "order-detail";
 
 const placeholderViews = new Set<WorkspaceView>(["clients", "fulfillment"]);
 
@@ -161,6 +169,9 @@ function ProjectDetail({
   sampleWorkspace,
   quotationWorkspace,
   orderWorkspace,
+  productLibrary,
+  onBrowseProducts,
+  onOpenProduct,
   onOpenSample,
   onOpenQuotation,
   onCreateQuotation,
@@ -175,6 +186,9 @@ function ProjectDetail({
   sampleWorkspace: SampleWorkspace;
   quotationWorkspace: QuotationWorkspace;
   orderWorkspace: OrderWorkspace;
+  productLibrary: ProductLibraryData;
+  onBrowseProducts: () => void;
+  onOpenProduct: (id: string) => void;
   onOpenSample: (id: string) => void;
   onOpenQuotation: (id: string) => void;
   onCreateQuotation: () => void;
@@ -193,6 +207,9 @@ function ProjectDetail({
       sampleWorkspace={sampleWorkspace}
       quotationWorkspace={quotationWorkspace}
       orderWorkspace={orderWorkspace}
+      productLibrary={productLibrary}
+      onBrowseProducts={onBrowseProducts}
+      onOpenProduct={onOpenProduct}
       onOpenSample={onOpenSample}
       onOpenQuotation={onOpenQuotation}
       onCreateQuotation={onCreateQuotation}
@@ -355,6 +372,10 @@ export default function Home() {
   const [sampleWorkspace, dispatchSample] = useReducer(sampleWorkspaceReducer, undefined, createSampleWorkspace);
   const [quotationWorkspace, dispatchQuotation] = useReducer(quotationWorkspaceReducer, undefined, createQuotationWorkspace);
   const [orderWorkspace, dispatchOrder] = useReducer(orderWorkspaceReducer, undefined, createOrderWorkspace);
+  const [productLibrary, setProductLibrary] = useState(mockProductLibraryRepository.load);
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [productReturnView, setProductReturnView] = useState<View>("products");
+  const [productToAdd, setProductToAdd] = useState<{ id: string; variantId?: string } | null>(null);
   const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
   const [activeQuotationId, setActiveQuotationId] = useState<string | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
@@ -368,6 +389,7 @@ export default function Home() {
   const openSample = (id: string) => { setActiveSampleId(id); setView("sample-detail"); window.scrollTo({ top: 0 }); };
   const openQuotation = (id: string) => { setActiveQuotationId(id); setView("quotation-detail"); window.scrollTo({ top: 0 }); };
   const openOrder = (id: string) => { setActiveOrderId(id); setView("order-detail"); window.scrollTo({ top: 0 }); };
+  const openProduct = (id: string) => { setProductReturnView(view); setActiveProductId(id); setView("product-detail"); window.scrollTo({ top: 0 }); };
   const activeSample = sampleWorkspace.samples.find((sample) => sample.id === activeSampleId);
   const activeQuotation = quotationWorkspace.quotations.find((quotation) => quotation.id === activeQuotationId);
   const activeOrder = orderWorkspace.orders.find((order) => order.id === activeOrderId);
@@ -377,9 +399,19 @@ export default function Home() {
     setProjects((all) => all.map((p) => p.id === activeProject.id ? { ...p, stage } : p));
     showToast(t("toast.stageUpdated", { stage: label(stage) }));
   };
-  const activeNav: WorkspaceView = view === "detail" ? "projects" : view === "sample-detail" ? "samples" : view === "quotation-detail" ? "quotations" : view === "order-detail" ? "orders" : view;
+  const activeNav: WorkspaceView = view === "detail" ? "projects" : view === "product-detail" ? "products" : view === "sample-detail" ? "samples" : view === "quotation-detail" ? "quotations" : view === "order-detail" ? "orders" : view;
   const title = useMemo(() => { const item = workspaceNavigation.find((entry) => entry.id === activeNav); return item ? t(item.key) : t("nav.dashboard"); }, [activeNav, t]);
-  const isPlaceholder = view !== "detail" && view !== "sample-detail" && view !== "quotation-detail" && view !== "order-detail" && placeholderViews.has(view) && !(view === "clients" && sampleClient);
+  const isPlaceholder = view !== "detail" && view !== "product-detail" && view !== "sample-detail" && view !== "quotation-detail" && view !== "order-detail" && placeholderViews.has(view) && !(view === "clients" && sampleClient);
+  const addCurrentProduct = (projectId: number, variantId: string | undefined, note: string) => {
+    if (!productToAdd || !projects.some((project) => project.id === projectId)) return false;
+    const product = getProductById(productLibrary, productToAdd.id);
+    if (!product) return false;
+    const next = addProductToProject(productLibrary, { projectId, productId: product.id, variantId, source: "library", applicationNote: { zh: note, en: note }, proposalStatus: "candidate" });
+    if (next === productLibrary) { showToast(t("product.alreadyLinked")); return false; }
+    setProductLibrary(next);
+    showToast(t("product.addSuccess"));
+    return true;
+  };
   const createOrOpenQuotation = (sampleId: string) => {
     const sample = sampleWorkspace.samples.find((item) => item.id === sampleId);
     if (!sample) return;
@@ -467,7 +499,9 @@ export default function Home() {
       >
           {view === "dashboard" && <DashboardView projects={projects} onOpenProject={openProject} onNavigate={setView} onOpenNewProject={() => setNewProject(true)} />}
           {view === "projects" && <Projects projects={projects} openProject={openProject} openNew={() => setNewProject(true)} />}
-          {view === "detail" && <ProjectDetail project={activeProject} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} orderWorkspace={orderWorkspace} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} onOpenOrder={openOrder} language={language} initialTab={projectTab} />}
+          {view === "products" && <ProductLibrary data={productLibrary} onOpen={openProduct} />}
+          {view === "product-detail" && activeProductId && <ProductLibraryDetail key={activeProductId} data={productLibrary} productId={activeProductId} onBack={() => setView(productReturnView === "product-detail" ? "products" : productReturnView)} onAdd={(id, variantId) => setProductToAdd({ id, variantId })} />}
+          {view === "detail" && <ProjectDetail project={activeProject} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} orderWorkspace={orderWorkspace} productLibrary={productLibrary} onBrowseProducts={() => setView("products")} onOpenProduct={openProduct} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} onOpenOrder={openOrder} language={language} initialTab={projectTab} />}
           {view === "samples" && <SampleCenter workspace={sampleWorkspace} projects={projects} onOpenSample={openSample} language={language} />}
           {view === "sample-detail" && activeSample && <SampleDetail key={activeSample.id} context={getSampleContext(activeSample, sampleWorkspace, projects)} language={language} dispatch={dispatchSample} onBack={() => setView("samples")} onProject={() => { const p = projects.find((project) => project.id === activeSample.projectId); if (p) openProject(p, "samples"); }} onClient={() => { setSampleClientId(activeSample.clientId); setView("clients"); window.scrollTo({ top: 0 }); }} onCreateQuotation={() => createOrOpenQuotation(activeSample.id)} showToast={showToast} />}
           {view === "quotations" && <QuotationCenter workspace={quotationWorkspace} projects={projects} language={language} onOpenQuotation={openQuotation} onCreate={() => createForProject(activeProject)} />}
@@ -482,6 +516,7 @@ export default function Home() {
           {isPlaceholder && <EmptyState title={title} description={t("errors.modulePending")} />}
       </WorkspaceShell>
       {newProject && <NewProjectModal onClose={() => setNewProject(false)} onCreate={(p) => { setProjects((x) => [p, ...x]); setNewProject(false); showToast(t("toast.projectCreated")); openProject(p); }} />}
+      {productToAdd && getProductById(productLibrary, productToAdd.id) && <AddProductToProjectDialog product={getProductById(productLibrary, productToAdd.id)!} variants={getVariantsForProduct(productLibrary, productToAdd.id)} projects={projects} initialVariantId={productToAdd.variantId} onAdd={addCurrentProduct} onClose={() => setProductToAdd(null)} />}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}
     </>
   );

@@ -7,6 +7,7 @@ export type WorkspaceView =
   | "dashboard"
   | "clients"
   | "projects"
+  | "products"
   | "samples"
   | "quotations"
   | "orders"
@@ -30,6 +31,7 @@ export const workspaceNavigation: Array<{
   { id: "dashboard", key: "nav.dashboard", label: "工作台", en: "Workspace", icon: "⌂", placement: "primary" },
   { id: "clients", key: "nav.clients", label: "客户与品牌", en: "Clients & Brands", icon: "◎", placement: "primary" },
   { id: "projects", key: "nav.projects", label: "销售项目", en: "Sales Projects", icon: "▦", placement: "primary" },
+  { id: "products", key: "nav.products", label: "产品资源库", en: "Product Library", icon: "◇", placement: "primary" },
   { id: "samples", key: "nav.samples", label: "样品中心", en: "Sample Center", icon: "◈", placement: "primary" },
   { id: "quotations", key: "nav.quotations", label: "报价中心", en: "Quotation Center", icon: "¥", placement: "primary" },
   { id: "orders", key: "nav.orders", label: "订单中心", en: "Order Center", icon: "▤", placement: "primary" },

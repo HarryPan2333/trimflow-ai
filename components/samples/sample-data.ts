@@ -1,6 +1,8 @@
 import { clients, contacts, projects, projectRequirements, quotations, samples, sampleVersions, sampleFeedback } from "../../lib/mock-data";
 import type { Project, Sample, SampleFeedback, SampleSpecification, SampleStatus, SampleVersion } from "../../lib/mock-data";
 import type { Language } from "../../lib/i18n";
+import { mockProductLibrary } from "../../lib/mock-data/product-library";
+import { createSampleVersionSnapshot } from "../../lib/product-library/integration";
 
 export type SampleWorkspace = { samples: Sample[]; versions: SampleVersion[]; feedback: SampleFeedback[] };
 export type DevelopmentStatus = "Requested" | "In Development" | "Ready" | "Sent" | "Client Reviewing" | "Revision Required" | "Approved" | "Rejected" | "Closed";
@@ -40,7 +42,7 @@ export function getSampleContext(sample: Sample, workspace: SampleWorkspace, all
     project: allProjects.find((project) => project.id === sample.projectId),
     contacts: contacts.filter((contact) => contact.clientId === sample.clientId),
     requirements: projectRequirements.filter((requirement) => requirement.projectId === sample.projectId && (sample.product.includes(requirement.product) || requirement.product.includes(sample.product))),
-    quotations: quotations.filter((quote) => quote.projectId === sample.projectId && quote.product === sample.product),
+    quotations: quotations.filter((quote) => quote.projectId === sample.projectId && (sample.productId ? quote.lineItems?.some((line) => line.productId === sample.productId && line.variantId === sample.variantId) : quote.product === sample.product)),
   };
 }
 
@@ -182,5 +184,11 @@ export function createRevision(context: SampleContext, specifications: Record<st
   const previous = getSpecification(context);
   const changes = Object.entries(specifications).filter(([key, value]) => value.value !== previous[key]?.value || value.status !== previous[key]?.status)
     .map(([key, value]) => `${specificationFields.find(([id]) => id === key)?.[1] ?? extraLabels[key] ?? key}：${value.value || emptyValue}`);
-  return { id: `${context.sample.id}-V${number}`, sampleId: context.sample.id, projectId: context.sample.projectId, version: `V${number}`, createdAt: DEMO_DATE, status: "制作中", summary: reason, changes: changes.length ? changes : ["继承上一版规格；按反馈要求继续开发"], specifications, reasonForChange: reason, internalNote: note, revisionFeedbackIds: getOpenRevisionFeedback(context).map((item) => item.id) };
+  const result: SampleVersion = { id: `${context.sample.id}-V${number}`, sampleId: context.sample.id, projectId: context.sample.projectId, version: `V${number}`, createdAt: DEMO_DATE, status: "制作中", summary: reason, changes: changes.length ? changes : ["继承上一版规格；按反馈要求继续开发"], specifications, reasonForChange: reason, internalNote: note, revisionFeedbackIds: getOpenRevisionFeedback(context).map((item) => item.id) };
+  if (context.sample.productId) {
+    const snapshot = createSampleVersionSnapshot(mockProductLibrary, result, context.sample.productId, context.sample.variantId);
+    // A physical sample revision is not automatically a revision of the catalog design.
+    result.configurationSnapshot = snapshot && { ...snapshot, source: { productId: context.sample.productId, variantId: context.sample.variantId } };
+  }
+  return result;
 }

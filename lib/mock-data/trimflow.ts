@@ -2,6 +2,7 @@ import type { BusinessCase, ProjectStage } from "./types";
 import { withSampleDevelopment } from "./sample-development";
 import { withQuotationDevelopment } from "./quotation-development";
 import { withOrderExecution } from "./order-execution";
+import { withProductLibraryLinks } from "./product-library-links";
 
 export const projectStages: ProjectStage[] = [
   "新询盘",
@@ -392,4 +393,4 @@ const caseC: BusinessCase = {
   ],
 };
 
-export const businessCases: BusinessCase[] = withOrderExecution(withQuotationDevelopment(withSampleDevelopment([caseA, caseB, caseC])));
+export const businessCases: BusinessCase[] = withProductLibraryLinks(withOrderExecution(withQuotationDevelopment(withSampleDevelopment([caseA, caseB, caseC]))));

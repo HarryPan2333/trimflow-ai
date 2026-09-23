@@ -40,6 +40,7 @@ import {
   timelineEvents,
 } from "../../lib/mock-data";
 import type { LifecycleMilestone } from "../business/lifecycle-stepper";
+import { getLegacyClient, getLegacyContacts } from "../../lib/accounts/legacy-adapter";
 import { localizeNarrative, type Language } from "../../lib/i18n";
 
 export type ProjectCommandData = {
@@ -101,14 +102,14 @@ function shortDate(value?: string, language: Language = "zh") {
   return new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-CA", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(value));
 }
 
-export function getProjectCommandData(project: Project): ProjectCommandData {
+export function getProjectCommandData(project: Project, accountState?: import("../../lib/accounts/types").AccountState): ProjectCommandData {
   const quoteIds = new Set(quotations.filter((item) => item.projectId === project.id).map((item) => item.id));
   const poIds = new Set(purchaseOrders.filter((item) => item.projectId === project.id).map((item) => item.id));
   const sampleIds = new Set(samples.filter((item) => item.projectId === project.id).map((item) => item.id));
   return {
     project,
-    client: clients.find((item) => item.id === project.clientId),
-    contacts: contacts.filter((item) => item.clientId === project.clientId),
+    client: accountState ? getLegacyClient(accountState, project.clientId) : clients.find((item) => item.id === project.clientId),
+    contacts: accountState ? getLegacyContacts(accountState, project.clientId) : contacts.filter((item) => item.clientId === project.clientId),
     requirements: projectRequirements.filter((item) => item.projectId === project.id),
     samples: samples.filter((item) => item.projectId === project.id),
     sampleVersions: sampleVersions.filter((item) => item.projectId === project.id || sampleIds.has(item.sampleId)),

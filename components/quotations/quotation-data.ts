@@ -17,6 +17,7 @@ import type {
 } from "../../lib/mock-data";
 import { DEMO_DATE, getSampleReadiness, getSpecificationRows, type SampleContext } from "../samples/sample-data";
 import type { Language } from "../../lib/i18n";
+import { getLegacyClient } from "../../lib/accounts/legacy-adapter";
 
 const localize = (language: Language, zh: string, en: string) => language === "zh" ? zh : en;
 
@@ -71,13 +72,13 @@ export function effectiveStatus(quote: Quotation): QuotationStatus {
   return quote.validUntil && quote.validUntil < DEMO_DATE ? "Expired" : quote.status;
 }
 
-export function getQuotationContext(quotation: Quotation, workspace: QuotationWorkspace, allProjects: Project[] = projects): QuotationContext {
+export function getQuotationContext(quotation: Quotation, workspace: QuotationWorkspace, allProjects: Project[] = projects, accountState?: import("../../lib/accounts/types").AccountState): QuotationContext {
   const versions = workspace.quotations
     .filter((item) => item.projectId === quotation.projectId && (quotation.quotationSeriesId ? item.quotationSeriesId === quotation.quotationSeriesId : item.product === quotation.product))
     .sort((a, b) => versionNumber(a.version) - versionNumber(b.version));
   return {
     quotation,
-    client: clients.find((item) => item.id === quotation.clientId),
+    client: accountState ? getLegacyClient(accountState, quotation.clientId) : clients.find((item) => item.id === quotation.clientId),
     project: allProjects.find((item) => item.id === quotation.projectId),
     tiers: workspace.tiers.filter((item) => item.quotationId === quotation.id).sort((a, b) => a.minimumQuantity - b.minimumQuantity),
     records: workspace.records.filter((item) => item.quotationId === quotation.id || item.projectId === quotation.projectId).sort((a, b) => a.recordedAt.localeCompare(b.recordedAt)),

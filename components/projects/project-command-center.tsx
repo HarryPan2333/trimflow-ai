@@ -23,6 +23,7 @@ import type { OrderWorkspace } from "../orders/order-data";
 import { useI18n } from "../providers/language-provider";
 import type { ProductLibraryData } from "../../lib/product-library/types";
 import { getProjectProducts, getProductById } from "../../lib/product-library/selectors";
+import type { AccountState } from "../../lib/accounts/types";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
@@ -30,6 +31,7 @@ const tabs: TabId[] = ["overview", "requirements", "samples", "quotations", "com
 
 type ProjectCommandCenterProps = {
   project: Project;
+  accountState?: AccountState;
   stages: ProjectStage[];
   onBack: () => void;
   onUpdateStage: (stage: ProjectStage) => void;
@@ -49,18 +51,18 @@ type ProjectCommandCenterProps = {
   initialTab?: "overview" | "samples" | "quotations" | "orders";
 };
 
-export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+export function ProjectCommandCenter({ project, accountState, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
   const { language: appLanguage, t, text } = useI18n();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
   const data = useMemo(() => {
-    const base = getProjectCommandData(project);
+    const base = getProjectCommandData(project, accountState);
     const projectQuotes = quotationWorkspace.quotations.filter((item) => item.projectId === project.id);
     const quoteIds = new Set(projectQuotes.map((item) => item.id));
     const projectOrders = orderWorkspace.orders.filter((item) => item.projectId === project.id);
     const orderIds = new Set(projectOrders.map((item) => item.id));
     return { ...base, samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id), purchaseOrders: projectOrders, orderLines: orderWorkspace.lines.filter((item) => orderIds.has(item.purchaseOrderId)), contracts: orderWorkspace.contracts.filter((item) => item.projectId === project.id), deliveries: orderWorkspace.deliveries.filter((item) => item.projectId === project.id), shipments: orderWorkspace.shipments.filter((item) => item.projectId === project.id) };
-  }, [orderWorkspace, project, quotationWorkspace, sampleWorkspace]);
+  }, [accountState, orderWorkspace, project, quotationWorkspace, sampleWorkspace]);
   const [localEvents, setLocalEvents] = useState<TimelineEvent[]>(data.timeline);
   const priority = getOpportunityPriority(data, appLanguage);
   const opportunity = getCommercialOpportunity(data, appLanguage);
@@ -94,7 +96,7 @@ export function ProjectCommandCenter({ project, stages, onBack, onUpdateStage, s
 
       {tab === "overview" && <ProjectOverview data={data} events={localEvents} onViewTimeline={() => setTab("timeline")} />}
       {tab === "requirements" && <RequirementsPanel data={data} />}
-      {tab === "samples" && <Card className="sample-workspace sample-list-panel"><div className="sample-section-head"><div><h2>{t("project.samples.title")}</h2><p>{project.code} · {t("project.samples.subtitle")}</p></div><Badge>{t("common.demoWorkspace")}</Badge></div><SampleList rows={data.samples.map((sample) => getSampleContext(sample, sampleWorkspace, [project]))} onOpenSample={onOpenSample} language={language} /></Card>}
+      {tab === "samples" && <Card className="sample-workspace sample-list-panel"><div className="sample-section-head"><div><h2>{t("project.samples.title")}</h2><p>{project.code} · {t("project.samples.subtitle")}</p></div><Badge>{t("common.demoWorkspace")}</Badge></div><SampleList rows={data.samples.map((sample) => getSampleContext(sample, sampleWorkspace, [project], accountState))} onOpenSample={onOpenSample} language={language} /></Card>}
       {tab === "quotations" && <QuotationsPanel data={data} onOpen={onOpenQuotation} onCreate={onCreateQuotation} />}
       {tab === "communications" && <CommunicationsPanel data={data} onAdd={() => setActivityModal(true)} />}
       {tab === "orders" && <OrdersPanel data={data} onOpenOrder={onOpenOrder} />}

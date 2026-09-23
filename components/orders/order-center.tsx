@@ -5,6 +5,7 @@ import { PageHeader } from "../layout/page-header";
 import type { InterfaceLanguage } from "../layout/workspace-shell";
 import { Badge, Card } from "../ui/primitives";
 import type { Project } from "../../lib/mock-data";
+import type { AccountState } from "../../lib/accounts/types";
 import type { QuotationWorkspace } from "../quotations/quotation-data";
 import { formatOrderValue, getOrderContext, getOrderHealth, getOrderMetrics, matchesOrderFilter, type OrderFilter, type OrderWorkspace } from "./order-data";
 import { useI18n } from "../providers/language-provider";
@@ -13,15 +14,15 @@ const filters: Array<{ id: OrderFilter; key: "order.all" | "order.active" | "ord
   { id: "All", key: "order.all" }, { id: "Active", key: "order.active" }, { id: "At Risk", key: "order.atRisk" }, { id: "Shipping Soon", key: "order.shippingSoon" }, { id: "Completed", key: "order.completed" },
 ];
 
-export function OrderCenter({ workspace, quotationWorkspace, projects, onOpenOrder }: { workspace: OrderWorkspace; quotationWorkspace: QuotationWorkspace; projects: Project[]; language: InterfaceLanguage; onOpenOrder: (id: string) => void }) {
+export function OrderCenter({ workspace, quotationWorkspace, projects, accountState, onOpenOrder }: { workspace: OrderWorkspace; quotationWorkspace: QuotationWorkspace; projects: Project[]; accountState?: AccountState; language: InterfaceLanguage; onOpenOrder: (id: string) => void }) {
   const { language, t, label, text, formatDate } = useI18n();
   const [filter, setFilter] = useState<OrderFilter>("All");
   const [search, setSearch] = useState("");
   const metrics = getOrderMetrics(workspace, quotationWorkspace, projects);
-  const rows = useMemo(() => workspace.orders.map((order) => getOrderContext(order, workspace, quotationWorkspace, projects)).filter((context) => {
+  const rows = useMemo(() => workspace.orders.map((order) => getOrderContext(order, workspace, quotationWorkspace, projects, accountState)).filter((context) => {
     const text = `${context.order.poNumber} ${context.client?.name} ${context.project?.code} ${context.project?.name} ${context.lines.map((item) => item.product).join(" ")}`.toLowerCase();
     return matchesOrderFilter(context, filter) && text.includes(search.trim().toLowerCase());
-  }).sort((a, b) => b.order.poDate.localeCompare(a.order.poDate)), [filter, projects, quotationWorkspace, search, workspace]);
+  }).sort((a, b) => b.order.poDate.localeCompare(a.order.poDate)), [accountState, filter, projects, quotationWorkspace, search, workspace]);
   return <div className="order-workspace">
     <PageHeader title={t("order.centerTitle")} subtitle={t("order.centerSubtitle")} />
     <Card className="order-metrics"><div><span>{t("order.active")}</span><strong>{metrics.active}</strong></div><div><span>{t("order.atRisk")}</span><strong>{metrics.atRisk}</strong></div><div><span>{t("order.shippingSoon")}</span><strong>{metrics.shippingSoon}</strong></div><div><span>{t("order.completed")}</span><strong>{metrics.completed}</strong></div></Card>

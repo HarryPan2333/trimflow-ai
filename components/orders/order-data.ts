@@ -7,6 +7,7 @@ import {
   purchaseOrders,
   shipments,
 } from "../../lib/mock-data";
+import { getLegacyClient } from "../../lib/accounts/legacy-adapter";
 import type {
   Client,
   Contract,
@@ -106,10 +107,10 @@ function appendEvent(order: PurchaseOrder, event: OrderTimelineEvent) {
   return [...(order.executionTimeline ?? []), event];
 }
 
-export function getOrderContext(order: PurchaseOrder, workspace: OrderWorkspace, quotationWorkspace: QuotationWorkspace, allProjects: Project[] = projects): OrderContext {
+export function getOrderContext(order: PurchaseOrder, workspace: OrderWorkspace, quotationWorkspace: QuotationWorkspace, allProjects: Project[] = projects, accountState?: import("../../lib/accounts/types").AccountState): OrderContext {
   return {
     order,
-    client: clients.find((item) => item.id === order.clientId),
+    client: accountState ? getLegacyClient(accountState, order.clientId) : clients.find((item) => item.id === order.clientId),
     project: allProjects.find((item) => item.id === order.projectId),
     quotation: quotationWorkspace.quotations.find((item) => item.id === order.quotationId),
     lines: workspace.lines.filter((item) => item.purchaseOrderId === order.id),
@@ -237,12 +238,12 @@ export function matchesOrderFilter(context: OrderContext, filter: OrderFilter) {
   return context.order.currentStage === "Completed";
 }
 
-export function createOrderFromQuote(quote: Quotation, workspace: OrderWorkspace, allProjects: Project[] = projects) {
+export function createOrderFromQuote(quote: Quotation, workspace: OrderWorkspace, allProjects: Project[] = projects, accountState?: import("../../lib/accounts/types").AccountState) {
   const existing = workspace.orders.find((item) => item.quotationId === quote.id);
   if (existing) return { existing } as const;
   if (quote.status !== "Accepted") return { blocked: "Only an Accepted quotation can create a Purchase Order." } as const;
   const project = allProjects.find((item) => item.id === quote.projectId);
-  const client = clients.find((item) => item.id === quote.clientId);
+  const client = accountState ? getLegacyClient(accountState, quote.clientId) : clients.find((item) => item.id === quote.clientId);
   const id = `po-${quote.id.toLowerCase()}`;
   const poNumber = `PO-${project?.code ?? quote.projectId}-${quote.version}-DEMO`;
   const deliveryDate = /^\d{4}-\d{2}-\d{2}$/.test(project?.delivery ?? "") ? project!.delivery : "";

@@ -3,6 +3,8 @@ import type { Project, Sample, SampleFeedback, SampleSpecification, SampleStatus
 import type { Language } from "../../lib/i18n";
 import { mockProductLibrary } from "../../lib/mock-data/product-library";
 import { createSampleVersionSnapshot } from "../../lib/product-library/integration";
+import type { AccountState } from "../../lib/accounts/types";
+import { getLegacyClient, getLegacyContacts } from "../../lib/accounts/legacy-adapter";
 
 export type SampleWorkspace = { samples: Sample[]; versions: SampleVersion[]; feedback: SampleFeedback[] };
 export type DevelopmentStatus = "Requested" | "In Development" | "Ready" | "Sent" | "Client Reviewing" | "Revision Required" | "Approved" | "Rejected" | "Closed";
@@ -33,14 +35,14 @@ export function createSampleWorkspace(): SampleWorkspace {
   return { samples: structuredClone(samples), versions: structuredClone(sampleVersions), feedback: structuredClone(sampleFeedback) };
 }
 
-export function getSampleContext(sample: Sample, workspace: SampleWorkspace, allProjects: Project[] = projects) {
+export function getSampleContext(sample: Sample, workspace: SampleWorkspace, allProjects: Project[] = projects, accountState?: AccountState) {
   const versions = workspace.versions.filter((version) => version.sampleId === sample.id).sort((a, b) => Number(a.version.slice(1)) - Number(b.version.slice(1)));
   const current = versions.find((version) => version.id === sample.currentVersionId) ?? versions.at(-1);
   return { sample, current, versions,
     feedback: workspace.feedback.filter((feedback) => feedback.sampleId === sample.id),
-    client: clients.find((client) => client.id === sample.clientId),
+    client: accountState ? getLegacyClient(accountState, sample.clientId) : clients.find((client) => client.id === sample.clientId),
     project: allProjects.find((project) => project.id === sample.projectId),
-    contacts: contacts.filter((contact) => contact.clientId === sample.clientId),
+    contacts: accountState ? getLegacyContacts(accountState, sample.clientId) : contacts.filter((contact) => contact.clientId === sample.clientId),
     requirements: projectRequirements.filter((requirement) => requirement.projectId === sample.projectId && (sample.product.includes(requirement.product) || requirement.product.includes(sample.product))),
     quotations: quotations.filter((quote) => quote.projectId === sample.projectId && (sample.productId ? quote.lineItems?.some((line) => line.productId === sample.productId && line.variantId === sample.variantId) : quote.product === sample.product)),
   };

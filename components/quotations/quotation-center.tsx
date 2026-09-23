@@ -6,6 +6,7 @@ import { PageHeader } from "../layout/page-header";
 import { StatusBadge } from "../business/status-badge";
 import { Badge, Button, Card } from "../ui/primitives";
 import type { Project } from "../../lib/mock-data";
+import type { AccountState } from "../../lib/accounts/types";
 import { useI18n } from "../providers/language-provider";
 import {
   effectiveStatus,
@@ -21,9 +22,10 @@ import {
 
 const filters: QuotationFilter[] = ["All", "Draft", "Sent", "Negotiating", "Accepted", "Expired"];
 
-export function QuotationCenter({ workspace, projects, onOpenQuotation, onCreate }: {
+export function QuotationCenter({ workspace, projects, accountState, onOpenQuotation, onCreate }: {
   workspace: QuotationWorkspace;
   projects: Project[];
+  accountState?: AccountState;
   language: InterfaceLanguage;
   onOpenQuotation: (id: string) => void;
   onCreate: () => void;
@@ -32,12 +34,12 @@ export function QuotationCenter({ workspace, projects, onOpenQuotation, onCreate
   const [search, setSearch] = useState("");
   const metrics = getQuotationMetrics(workspace);
   const rows = useMemo(() => workspace.quotations
-    .map((quotation) => getQuotationContext(quotation, workspace, projects))
+    .map((quotation) => getQuotationContext(quotation, workspace, projects, accountState))
     .filter((context) => {
       const haystack = `${context.quotation.id} ${context.client?.name} ${context.project?.code} ${context.project?.name} ${context.quotation.product}`.toLowerCase();
       return statusMatches(context.quotation, filter) && haystack.includes(search.trim().toLowerCase());
     })
-    .sort((a, b) => (b.quotation.lastActivityAt ?? b.quotation.issuedAt).localeCompare(a.quotation.lastActivityAt ?? a.quotation.issuedAt)), [filter, projects, search, workspace]);
+    .sort((a, b) => (b.quotation.lastActivityAt ?? b.quotation.issuedAt).localeCompare(a.quotation.lastActivityAt ?? a.quotation.issuedAt)), [accountState, filter, projects, search, workspace]);
   const { language: interfaceLanguage, t, label, text, formatDate } = useI18n();
 
   return <div className="quotation-workspace">

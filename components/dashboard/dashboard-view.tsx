@@ -7,6 +7,8 @@ import {
   quotations, sampleVersions, samples, shipments, tasks, timelineEvents,
 } from "../../lib/mock-data";
 import type { Project } from "../../lib/mock-data";
+import type { AccountState } from "../../lib/accounts/types";
+import { getLegacyClients } from "../../lib/accounts/legacy-adapter";
 import { AccountPortfolio } from "./account-portfolio";
 import { ExecutiveOverview } from "./executive-overview";
 import { MarketIntelligence } from "./market-intelligence";
@@ -21,14 +23,15 @@ import { useI18n } from "../providers/language-provider";
 
 type DashboardViewProps = {
   projects: Project[];
+  accountState?: AccountState;
   onOpenProject: (project: Project) => void;
   onNavigate: (target: DashboardKpi["target"]) => void;
   onOpenNewProject: () => void;
 };
 
-export function DashboardView({ projects, onOpenProject, onNavigate, onOpenNewProject }: DashboardViewProps) {
+export function DashboardView({ projects, accountState, onOpenProject, onNavigate, onOpenNewProject }: DashboardViewProps) {
   const { language, t } = useI18n();
-  const data: DashboardData = { projects, clients, requirements: projectRequirements, samples, sampleVersions, quotations, purchaseOrders, deliveries, shipments, communications, tasks, timelineEvents };
+  const data: DashboardData = { projects, clients: accountState ? getLegacyClients(accountState) : clients, requirements: projectRequirements, samples, sampleVersions, quotations, purchaseOrders, deliveries, shipments, communications, tasks, timelineEvents };
   return (
     <div className="command-dashboard">
       <PageHeader title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} actions={<><Button variant="secondary" onClick={() => onNavigate("projects")}>{t("dashboard.viewProjects")}</Button><Button onClick={onOpenNewProject}>＋ {t("actions.createProject")}</Button></>} />

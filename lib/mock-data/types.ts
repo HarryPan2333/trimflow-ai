@@ -101,6 +101,7 @@ export type Project = {
   lifecycleStage: LifecycleStage;
   progress: string;
   owner: string;
+  ownerActorId?: string;
   next: string;
   updated: string;
   lastUpdatedAt: string;

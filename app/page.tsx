@@ -6,11 +6,18 @@ import "../components/orders/order-workspace.css";
 import "../components/products/product-workspace.css";
 import "../components/theme/steep-editorial.css";
 import "../components/accounts/account-workspace.css";
+import "../components/deal-room/deal-room.css";
 
 import { useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { EmptyState } from "../components/business/empty-state";
 import { AccountCenter, type ProspectInput } from "../components/accounts/account-center";
 import { AccountWorkspace, type AccountTab } from "../components/accounts/account-workspace";
+import { DealRoomWorkspace } from "../components/deal-room/deal-room-workspace";
+import { createDealRoomState } from "../lib/deal-room/repository";
+import { createRoom } from "../lib/deal-room/commands";
+import { applyReviewedProposal } from "../lib/deal-room/apply";
+import { suggestRoomParticipants } from "../lib/deal-room/selectors";
+import type { DealRoomState } from "../lib/deal-room/types";
 import { NewProjectDialog } from "../components/accounts/new-project-dialog";
 import { createAccountState } from "../lib/accounts/repository";
 import { validateProjectAccountReference } from "../lib/accounts/validation";
@@ -54,7 +61,7 @@ import type { Project, ProjectStage as Stage } from "../lib/mock-data";
 import type { LocalizedText } from "../lib/i18n";
 
 type OutputLanguage = "中文" | "英文" | "中英对照";
-type View = WorkspaceView | "detail" | "account-detail" | "product-detail" | "sample-detail" | "quotation-detail" | "order-detail";
+type View = WorkspaceView | "detail" | "account-detail" | "product-detail" | "sample-detail" | "quotation-detail" | "order-detail" | "deal-room";
 
 const placeholderViews = new Set<WorkspaceView>(["fulfillment"]);
 
@@ -171,6 +178,9 @@ function Projects({ projects, openProject, openNew }: { projects: Project[]; ope
 function ProjectDetail({
   project,
   accountState,
+  dealRoomState,
+  onOpenDealRoom,
+  onCreateDealRoom,
   onBack,
   updateStage,
   showToast,
@@ -189,6 +199,9 @@ function ProjectDetail({
 }: {
   project: Project;
   accountState: AccountState;
+  dealRoomState: DealRoomState;
+  onOpenDealRoom: (id: string) => void;
+  onCreateDealRoom: (accountId: string, projectId?: number) => void;
   onBack: () => void;
   updateStage: (stage: Stage) => void;
   showToast: (s: string) => void;
@@ -210,6 +223,9 @@ function ProjectDetail({
       key={project.id}
       project={project}
       accountState={accountState}
+      dealRoomState={dealRoomState}
+      onOpenDealRoom={onOpenDealRoom}
+      onCreateDealRoom={onCreateDealRoom}
       stages={stages}
       onBack={onBack}
       onUpdateStage={updateStage}
@@ -319,8 +335,8 @@ function AIAssistant({ project, showToast }: { project: Project; showToast: (s: 
   );
 }
 
-function Todos({ showToast }: { showToast: (s: string) => void }) {
-  const { t, text } = useI18n();
+function Todos({ showToast, dealTasks = [], accountState }: { showToast: (s: string) => void; dealTasks?: DealRoomState["tasks"]; accountState: AccountState }) {
+  const { language, t, text } = useI18n();
   const [done, setDone] = useState<number[]>([3]);
   const tasks: Array<{ priority: string; title: LocalizedText; client: string | LocalizedText; due: LocalizedText; owner: string; today?: boolean }> = [
     { priority: "P1", title: { zh: "跟进 NAS-2407 样品测试安排", en: "Follow up on the NAS-2407 sample testing schedule" }, client: "North American Sportswear Brand", due: { zh: "今天 10:30", en: "Today, 10:30 AM" }, owner: "陈晨", today: true },
@@ -329,7 +345,7 @@ function Todos({ showToast }: { showToast: (s: string) => void }) {
     { priority: "P2", title: { zh: "整理户外客户的三档数量报价", en: "Prepare three volume tiers for the outdoor client" }, client: "Outdoor Clothing Client", due: { zh: "明天", en: "Tomorrow" }, owner: "陈晨" },
     { priority: "P3", title: { zh: "更新本周项目周报", en: "Update this week's project report" }, client: { zh: "全部项目", en: "All Projects" }, due: { zh: "周五 16:00", en: "Friday, 4:00 PM" }, owner: "陈晨" },
   ];
-  return <><PageHeader title={t("tasks.title")} subtitle={t("tasks.subtitle")} actions={<Button>＋ {t("tasks.add")}</Button>} /><div className="todo-summary"><Card><span>{t("tasks.todayDue")}</span><strong>3</strong></Card><Card><span>{t("tasks.weekTotal")}</span><strong>9</strong></Card><Card><span>{t("tasks.completed")}</span><strong>6</strong></Card><Card><span>{t("tasks.overdue")}</span><strong className="red-text">1</strong></Card></div><Card><div className="card-head"><div><h2>{t("tasks.myTasks")}</h2><p>{t("tasks.sortHelp")}</p></div><div className="segment"><button className="active">{t("common.all")}</button><button>{t("tasks.today")}</button><button>{t("tasks.filterWeek")}</button></div></div><div className="task-list">{tasks.map((task, i) => <div className={`task-row ${done.includes(i) ? "task-done" : ""}`} key={text(task.title)}><button className="task-check" onClick={() => { setDone((x) => x.includes(i) ? x.filter((n) => n !== i) : [...x, i]); showToast(done.includes(i) ? t("toast.taskRestored") : t("toast.taskCompleted")); }}>{done.includes(i) ? "✓" : ""}</button><span className={task.priority === "P1" ? "priority p1" : "priority"}>{task.priority}</span><div className="task-main"><strong>{text(task.title)}</strong><small>{text(task.client)}</small></div><span>{task.owner}</span><Badge tone={task.today ? "red" : "neutral"}>{text(task.due)}</Badge><button className="icon-btn">⋯</button></div>)}</div></Card></>;
+  return <><PageHeader title={t("tasks.title")} subtitle={t("tasks.subtitle")} actions={<Button>＋ {t("tasks.add")}</Button>} /><div className="todo-summary"><Card><span>{t("tasks.todayDue")}</span><strong>3</strong></Card><Card><span>{t("tasks.weekTotal")}</span><strong>9</strong></Card><Card><span>{t("tasks.completed")}</span><strong>6</strong></Card><Card><span>{t("tasks.overdue")}</span><strong className="red-text">1</strong></Card></div><Card><div className="card-head"><div><h2>{t("tasks.myTasks")}</h2><p>{t("tasks.sortHelp")}</p></div><div className="segment"><button className="active">{t("common.all")}</button><button>{t("tasks.today")}</button><button>{t("tasks.filterWeek")}</button></div></div><div className="task-list">{tasks.map((task, i) => <div className={`task-row ${done.includes(i) ? "task-done" : ""}`} key={text(task.title)}><button className="task-check" onClick={() => { setDone((x) => x.includes(i) ? x.filter((n) => n !== i) : [...x, i]); showToast(done.includes(i) ? t("toast.taskRestored") : t("toast.taskCompleted")); }}>{done.includes(i) ? "✓" : ""}</button><span className={task.priority === "P1" ? "priority p1" : "priority"}>{task.priority}</span><div className="task-main"><strong>{text(task.title)}</strong><small>{text(task.client)}</small></div><span>{task.owner}</span><Badge tone={task.today ? "red" : "neutral"}>{text(task.due)}</Badge><button className="icon-btn">⋯</button></div>)}{dealTasks.map((task) => <div className="task-row" key={task.id}><span className="task-check">○</span><span className="priority p2">{task.priority}</span><div className="task-main"><strong>{task.title}</strong><small>{task.accountId} · {task.sourceMessageIds.join(", ")}</small></div><span>{accountState.actors.find((actor) => actor.id === task.ownerActorId)?.displayName[language] ?? task.owner}</span><Badge>{task.dueDate || "—"}</Badge></div>)}</div></Card></>;
 }
 
 function Reports({ showToast }: { showToast: (s: string) => void }) {
@@ -368,6 +384,10 @@ export default function Home() {
   const [projects, setProjects] = useState(initialProjects);
   const [accountState, setAccountState] = useState(createAccountState);
   const accountStateRef = useRef(accountState);
+  const [dealRoomState, setDealRoomState] = useState(createDealRoomState);
+  const dealRoomRef = useRef(dealRoomState);
+  const [activeRoomId, setActiveRoomId] = useState("room-nas-project");
+  const [dealReturnView, setDealReturnView] = useState<"account-detail" | "detail">("account-detail");
   const [activeAccountId, setActiveAccountId] = useState("client-nas");
   const [accountTab, setAccountTab] = useState<AccountTab>("overview");
   const [activeProject, setActiveProject] = useState<Project>(initialProjects[0]);
@@ -390,6 +410,36 @@ export default function Home() {
   const executeAccount = (command: (state: AccountState) => AccountState, success: string) => {
     try { commitAccounts(command(accountStateRef.current)); showToast(success); return true; }
     catch (error) { showToast(t("account.failure", { reason: error instanceof Error ? error.message : String(error) })); return false; }
+  };
+  const commitDealRoom = (next: DealRoomState) => { dealRoomRef.current = next; setDealRoomState(next); };
+  const executeDealRoom = (command: (state: DealRoomState) => DealRoomState, success: string) => {
+    try { commitDealRoom(command(dealRoomRef.current)); showToast(success); return true; }
+    catch (error) { showToast(t("deal.failed", { reason: error instanceof Error ? error.message : String(error) })); return false; }
+  };
+  const openDealRoom = (id: string, returnView: "account-detail" | "detail" = "account-detail") => { setActiveRoomId(id); setDealReturnView(returnView); setView("deal-room"); window.scrollTo({ top: 0 }); };
+  const createDealRoom = (accountId: string, projectId?: number) => {
+    const existing = dealRoomRef.current.rooms.find((item) => item.status === "active" && item.accountId === accountId && item.projectId === projectId);
+    const returnView = projectId === undefined ? "account-detail" : "detail";
+    if (existing) { openDealRoom(existing.id, returnView); return; }
+    const project = projects.find((item) => item.id === projectId);
+    const participants = suggestRoomParticipants(accountStateRef.current, accountId, project?.ownerActorId);
+    if (!participants.length) participants.push("actor-sales-b");
+    const id = `room-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    const name = project?.code ?? accountStateRef.current.accounts.find((item) => item.id === accountId)?.name ?? "Account";
+    const ok = executeDealRoom((state) => createRoom(state, { id, accountId, projectId, title: { zh: `${name} 内部协作`, en: `${name} Team Collaboration` }, status: "active", participantActorIds: participants, createdAt: now, updatedAt: now }, accountStateRef.current, projects), t("deal.created"));
+    if (ok) openDealRoom(id, returnView);
+  };
+  const applyDealProposal = (proposalId: string, actorId: string) => {
+    try {
+      const result = applyReviewedProposal(dealRoomRef.current, proposalId, { accounts: accountStateRef.current, projects, samples: sampleWorkspace, actorId, at: new Date().toISOString() });
+      if (result.alreadyApplied) { showToast(t("deal.applied")); return false; }
+      commitDealRoom(result.dealRoom);
+      commitAccounts(result.accounts);
+      if (result.sampleFeedback) dispatchSample({ type: "feedback", feedback: result.sampleFeedback });
+      showToast(t("deal.applySaved"));
+      return true;
+    } catch (error) { showToast(t("deal.failed", { reason: error instanceof Error ? error.message : String(error) })); return false; }
   };
   const openAccount = (id: string, tab: AccountTab = "overview") => { setActiveAccountId(id); setAccountTab(tab); setView("account-detail"); window.scrollTo({ top: 0 }); };
   const createProspect = (input: ProspectInput, actorId = "actor-sales-b", id = `account-new-${Date.now()}`) => {
@@ -420,9 +470,9 @@ export default function Home() {
     setProjects((all) => all.map((p) => p.id === activeProject.id ? { ...p, stage } : p));
     showToast(t("toast.stageUpdated", { stage: label(stage) }));
   };
-  const activeNav: WorkspaceView = view === "detail" ? "projects" : view === "account-detail" ? "clients" : view === "product-detail" ? "products" : view === "sample-detail" ? "samples" : view === "quotation-detail" ? "quotations" : view === "order-detail" ? "orders" : view;
+  const activeNav: WorkspaceView = view === "detail" ? "projects" : view === "account-detail" ? "clients" : view === "deal-room" ? (dealReturnView === "detail" ? "projects" : "clients") : view === "product-detail" ? "products" : view === "sample-detail" ? "samples" : view === "quotation-detail" ? "quotations" : view === "order-detail" ? "orders" : view;
   const title = useMemo(() => { const item = workspaceNavigation.find((entry) => entry.id === activeNav); return item ? t(item.key) : t("nav.dashboard"); }, [activeNav, t]);
-  const isPlaceholder = view !== "detail" && view !== "account-detail" && view !== "product-detail" && view !== "sample-detail" && view !== "quotation-detail" && view !== "order-detail" && placeholderViews.has(view);
+  const isPlaceholder = view !== "detail" && view !== "account-detail" && view !== "deal-room" && view !== "product-detail" && view !== "sample-detail" && view !== "quotation-detail" && view !== "order-detail" && placeholderViews.has(view);
   const addCurrentProduct = (projectId: number, variantId: string | undefined, note: string) => {
     if (!productToAdd || !projects.some((project) => project.id === projectId)) return false;
     const product = getProductById(productLibrary, productToAdd.id);
@@ -520,18 +570,19 @@ export default function Home() {
       >
           {view === "dashboard" && <DashboardView projects={projects} accountState={accountState} onOpenProject={openProject} onNavigate={setView} onOpenNewProject={() => setNewProject(true)} />}
           {view === "clients" && <AccountCenter state={accountState} business={{ projects, products: productLibrary, samples: sampleWorkspace, quotations: quotationWorkspace, orders: orderWorkspace }} onOpen={openAccount} onCreate={createProspect} onResolve={resolveDuplicate} onRequest={requestAccountCollaboration} showToast={showToast} />}
-          {view === "account-detail" && <AccountWorkspace key={`${activeAccountId}-${accountTab}`} state={accountState} accountId={activeAccountId} initialTab={accountTab} business={{ projects, products: productLibrary, samples: sampleWorkspace, quotations: quotationWorkspace, orders: orderWorkspace }} onBack={() => setView("clients")} onOpenProject={(id) => { const p = projects.find((item) => item.id === id); if (p) openProject(p); }} execute={executeAccount} />}
+          {view === "account-detail" && <AccountWorkspace key={`${activeAccountId}-${accountTab}`} state={accountState} accountId={activeAccountId} initialTab={accountTab} business={{ projects, products: productLibrary, samples: sampleWorkspace, quotations: quotationWorkspace, orders: orderWorkspace }} dealRoomState={dealRoomState} onOpenDealRoom={(id) => openDealRoom(id, "account-detail")} onCreateDealRoom={() => createDealRoom(activeAccountId)} onBack={() => setView("clients")} onOpenProject={(id) => { const p = projects.find((item) => item.id === id); if (p) openProject(p); }} execute={executeAccount} />}
           {view === "projects" && <Projects projects={projects} openProject={openProject} openNew={() => setNewProject(true)} />}
           {view === "products" && <ProductLibrary data={productLibrary} onOpen={openProduct} />}
           {view === "product-detail" && activeProductId && <ProductLibraryDetail key={activeProductId} data={productLibrary} productId={activeProductId} onBack={() => setView(productReturnView === "product-detail" ? "products" : productReturnView)} onAdd={(id, variantId) => setProductToAdd({ id, variantId })} />}
-          {view === "detail" && <ProjectDetail project={activeProject} accountState={accountState} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} orderWorkspace={orderWorkspace} productLibrary={productLibrary} onBrowseProducts={() => setView("products")} onOpenProduct={openProduct} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} onOpenOrder={openOrder} language={language} initialTab={projectTab} />}
+          {view === "detail" && <ProjectDetail project={activeProject} accountState={accountState} dealRoomState={dealRoomState} onOpenDealRoom={(id) => openDealRoom(id, "detail")} onCreateDealRoom={createDealRoom} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} orderWorkspace={orderWorkspace} productLibrary={productLibrary} onBrowseProducts={() => setView("products")} onOpenProduct={openProduct} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} onOpenOrder={openOrder} language={language} initialTab={projectTab} />}
+          {view === "deal-room" && <DealRoomWorkspace key={activeRoomId} state={dealRoomState} accounts={accountState} projects={projects} samples={sampleWorkspace} quotations={quotationWorkspace} roomId={activeRoomId} onRoomChange={setActiveRoomId} onBack={() => setView(dealReturnView)} onAccount={openAccount} onProject={openProject} run={executeDealRoom} onApply={applyDealProposal} />}
           {view === "samples" && <SampleCenter workspace={sampleWorkspace} projects={projects} accountState={accountState} onOpenSample={openSample} language={language} />}
           {view === "sample-detail" && activeSample && <SampleDetail key={activeSample.id} context={getSampleContext(activeSample, sampleWorkspace, projects, accountState)} language={language} dispatch={dispatchSample} onBack={() => setView("samples")} onProject={() => { const p = projects.find((project) => project.id === activeSample.projectId); if (p) openProject(p, "samples"); }} onClient={() => openAccount(activeSample.clientId)} onCreateQuotation={() => createOrOpenQuotation(activeSample.id)} showToast={showToast} />}
           {view === "quotations" && <QuotationCenter workspace={quotationWorkspace} projects={projects} accountState={accountState} language={language} onOpenQuotation={openQuotation} onCreate={() => createForProject(activeProject)} />}
           {view === "quotation-detail" && activeQuotation && <QuotationDetail key={activeQuotation.id} context={getQuotationContext(activeQuotation, quotationWorkspace, projects, accountState)} language={language} dispatch={dispatchQuotation} onBack={() => setView("quotations")} onProject={() => { const p = projects.find((project) => project.id === activeQuotation.projectId); if (p) openProject(p, "quotations"); }} onSample={openSample} onOpenVersion={openQuotation} onCreatePO={() => createOrOpenOrder(activeQuotation.id)} showToast={showToast} />}
           {view === "orders" && <OrderCenter workspace={orderWorkspace} quotationWorkspace={quotationWorkspace} projects={projects} accountState={accountState} language={language} onOpenOrder={openOrder} />}
           {view === "order-detail" && activeOrder && <OrderDetail key={activeOrder.id} context={getOrderContext(activeOrder, orderWorkspace, quotationWorkspace, projects, accountState)} language={language} dispatch={dispatchOrder} onBack={() => setView("orders")} onClient={() => openAccount(activeOrder.clientId)} onProject={() => { const p = projects.find((project) => project.id === activeOrder.projectId); if (p) openProject(p, "orders"); }} onQuotation={() => openQuotation(activeOrder.quotationId)} showToast={showToast} />}
-          {view === "todos" && <Todos showToast={showToast} />}
+          {view === "todos" && <Todos showToast={showToast} dealTasks={dealRoomState.tasks} accountState={accountState} />}
           {view === "reports" && <Reports showToast={showToast} />}
           {view === "ai" && <><PageHeader title={t("ai.title")} subtitle={language === "zh" ? `当前关联项目：${activeProject.code} · ${activeProject.name}` : `Current project: ${activeProject.code} · ${label(activeProject.name)}`} /><AIAssistant project={activeProject} showToast={showToast} /></>}
           {(view === "templates" || view === "settings") && <SimplePage type={view} />}

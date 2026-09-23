@@ -24,6 +24,8 @@ import { useI18n } from "../providers/language-provider";
 import type { ProductLibraryData } from "../../lib/product-library/types";
 import { getProjectProducts, getProductById } from "../../lib/product-library/selectors";
 import type { AccountState } from "../../lib/accounts/types";
+import type { DealRoomState } from "../../lib/deal-room/types";
+import { DealRoomEntry } from "../deal-room/deal-room-entry";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
@@ -32,6 +34,9 @@ const tabs: TabId[] = ["overview", "requirements", "samples", "quotations", "com
 type ProjectCommandCenterProps = {
   project: Project;
   accountState?: AccountState;
+  dealRoomState: DealRoomState;
+  onOpenDealRoom: (id: string) => void;
+  onCreateDealRoom: (accountId: string, projectId?: number) => void;
   stages: ProjectStage[];
   onBack: () => void;
   onUpdateStage: (stage: ProjectStage) => void;
@@ -51,7 +56,7 @@ type ProjectCommandCenterProps = {
   initialTab?: "overview" | "samples" | "quotations" | "orders";
 };
 
-export function ProjectCommandCenter({ project, accountState, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+export function ProjectCommandCenter({ project, accountState, dealRoomState, onOpenDealRoom, onCreateDealRoom, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
   const { language: appLanguage, t, text } = useI18n();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
@@ -61,9 +66,15 @@ export function ProjectCommandCenter({ project, accountState, stages, onBack, on
     const quoteIds = new Set(projectQuotes.map((item) => item.id));
     const projectOrders = orderWorkspace.orders.filter((item) => item.projectId === project.id);
     const orderIds = new Set(projectOrders.map((item) => item.id));
-    return { ...base, samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id), purchaseOrders: projectOrders, orderLines: orderWorkspace.lines.filter((item) => orderIds.has(item.purchaseOrderId)), contracts: orderWorkspace.contracts.filter((item) => item.projectId === project.id), deliveries: orderWorkspace.deliveries.filter((item) => item.projectId === project.id), shipments: orderWorkspace.shipments.filter((item) => item.projectId === project.id) };
-  }, [accountState, orderWorkspace, project, quotationWorkspace, sampleWorkspace]);
+    return { ...base, requirements: base.requirements.map((item) => dealRoomState.requirements.find((update) => update.id === item.id) ?? item), tasks: [...base.tasks, ...dealRoomState.tasks.filter((item) => item.projectId === project.id)], samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id), purchaseOrders: projectOrders, orderLines: orderWorkspace.lines.filter((item) => orderIds.has(item.purchaseOrderId)), contracts: orderWorkspace.contracts.filter((item) => item.projectId === project.id), deliveries: orderWorkspace.deliveries.filter((item) => item.projectId === project.id), shipments: orderWorkspace.shipments.filter((item) => item.projectId === project.id) };
+  }, [accountState, dealRoomState, orderWorkspace, project, quotationWorkspace, sampleWorkspace]);
   const [localEvents, setLocalEvents] = useState<TimelineEvent[]>(data.timeline);
+  const accountEvents: TimelineEvent[] = (accountState?.activities ?? []).filter((item) => item.projectId === project.id && item.id.startsWith("activity-proposal-")).map((item) => ({
+    id: `deal-${item.id}`, projectId: project.id, clientId: project.clientId, type: "communication",
+    occurredAt: item.occurredAt, displayDate: item.occurredAt.slice(0, 10), title: item.title[appLanguage],
+    description: item.detail[appLanguage], icon: "◎", actor: accountState?.actors.find((actor) => actor.id === item.actorId)?.displayName[appLanguage],
+  }));
+  const displayedEvents = [...localEvents, ...accountEvents].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   const priority = getOpportunityPriority(data, appLanguage);
   const opportunity = getCommercialOpportunity(data, appLanguage);
 
@@ -81,6 +92,7 @@ export function ProjectCommandCenter({ project, accountState, stages, onBack, on
   return (
     <div className="project-command-center">
       <ProjectHeader data={data} priority={priority} expectedValue={opportunity.estimatedValue} stages={stages} onBack={onBack} onUpdateStage={onUpdateStage} onAddActivity={() => setActivityModal(true)} onCreateSample={() => { setTab("samples"); showToast(appLanguage === "zh" ? "已打开项目样品；选择样品可创建后续版本" : "Project samples opened; select a sample to create a revision"); }} onCreateQuote={() => { setTab("quotations"); if (data.quotations.length) showToast(appLanguage === "zh" ? "已打开项目报价；点击记录进入谈判工作区" : "Project quotations opened; select a record to enter negotiation"); else onCreateQuotation(); }} onEditProject={() => showToast(appLanguage === "zh" ? "编辑项目为当前原型模拟操作" : "Edit project is a demo action")} />
+      {accountState && <DealRoomEntry state={dealRoomState} accounts={accountState} accountId={project.clientId} projectId={project.id} onOpen={onOpenDealRoom} onCreate={() => onCreateDealRoom(project.clientId, project.id)} />}
 
       <Card className="project-lifecycle-card">
         <div className="lifecycle-card-head"><div><span>Lifecycle Control</span><strong>{t("project.lifecycleControl")}</strong></div><StatusBadge status={project.lifecycleStage} /></div>
@@ -94,13 +106,13 @@ export function ProjectCommandCenter({ project, accountState, stages, onBack, on
         {tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><strong>{t(`project.tabs.${item}`)}</strong>{item === "requirements" && data.requirements.some((requirement) => requirement.status !== "已确认") && <b>{data.requirements.filter((requirement) => requirement.status !== "已确认").length}</b>}</button>)}
       </div>
 
-      {tab === "overview" && <ProjectOverview data={data} events={localEvents} onViewTimeline={() => setTab("timeline")} />}
+      {tab === "overview" && <ProjectOverview data={data} events={displayedEvents} onViewTimeline={() => setTab("timeline")} />}
       {tab === "requirements" && <RequirementsPanel data={data} />}
       {tab === "samples" && <Card className="sample-workspace sample-list-panel"><div className="sample-section-head"><div><h2>{t("project.samples.title")}</h2><p>{project.code} · {t("project.samples.subtitle")}</p></div><Badge>{t("common.demoWorkspace")}</Badge></div><SampleList rows={data.samples.map((sample) => getSampleContext(sample, sampleWorkspace, [project], accountState))} onOpenSample={onOpenSample} language={language} /></Card>}
-      {tab === "quotations" && <QuotationsPanel data={data} onOpen={onOpenQuotation} onCreate={onCreateQuotation} />}
+      {tab === "quotations" && <><QuotationsPanel data={data} onOpen={onOpenQuotation} onCreate={onCreateQuotation} />{dealRoomState.targetPriceSignals.filter((signal) => signal.projectId === project.id).map((signal) => <Card className="deal-entry" key={signal.id}><div className="deal-entry-head"><div><small>{signal.id} · {signal.sourceProposalId}</small><h2>{t("deal.targetPrice")}</h2><p>{signal.currency} {signal.unitPrice} / {signal.unit} · {signal.quantity.toLocaleString("en-US")} {signal.unit}</p><p>{signal.context}</p></div><StatusBadge status="Pending" /></div><p className="deal-entry-note">{t("deal.targetCaution")} · {t("deal.sourceCount", { count: signal.sourceMessageIds.length })}</p></Card>)}</>}
       {tab === "communications" && <CommunicationsPanel data={data} onAdd={() => setActivityModal(true)} />}
       {tab === "orders" && <OrdersPanel data={data} onOpenOrder={onOpenOrder} />}
-      {tab === "timeline" && <TimelinePanel events={localEvents} />}
+      {tab === "timeline" && <TimelinePanel events={displayedEvents} />}
       {tab === "ai" && aiCopilot}
 
       {activityModal && <Modal title={appLanguage === "zh" ? "添加项目活动" : "Add Project Activity"} onClose={() => setActivityModal(false)}><form className="modal-form" onSubmit={addActivity}><div className="form-row"><label>{appLanguage === "zh" ? "活动类型" : "Activity Type"}<select name="type"><option value="communication">{appLanguage === "zh" ? "客户沟通" : "Client Communication"}</option><option value="sample">{appLanguage === "zh" ? "样品进展" : "Sample Progress"}</option><option value="quotation">{appLanguage === "zh" ? "报价进展" : "Quotation Progress"}</option><option value="task">{appLanguage === "zh" ? "内部任务" : "Internal Task"}</option></select></label><label>{appLanguage === "zh" ? "活动标题" : "Activity Title"}<input name="title" required placeholder={appLanguage === "zh" ? "例如：收到客户价格反馈" : "Example: Received client price feedback"} /></label></div><label>{appLanguage === "zh" ? "活动内容" : "Activity Notes"}<textarea name="content" required rows={5} placeholder={appLanguage === "zh" ? "记录事实、客户信号与后续影响..." : "Record facts, client signals, and downstream impact..."} /></label><div className="modal-actions"><Button type="button" variant="ghost" onClick={() => setActivityModal(false)}>{t("actions.cancel")}</Button><Button type="submit">{t("actions.save")}</Button></div></form></Modal>}

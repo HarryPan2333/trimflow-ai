@@ -31,7 +31,7 @@ function readLanguage(): Language {
 }
 
 const enumLabels: Record<string, [string, string]> = {
-  "Hong Kong": ["香港", "Hong Kong"], "New York": ["纽约", "New York"], Paris: ["巴黎", "Paris"], Melbourne: ["墨尔本", "Melbourne"], Toronto: ["多伦多", "Toronto"],
+  "Hong Kong": ["香港", "Hong Kong"], "New York": ["纽约", "New York"], Paris: ["巴黎", "Paris"], Melbourne: ["墨尔本", "Melbourne"], Toronto: ["多伦多", "Toronto"], Canada: ["加拿大", "Canada"], Ontario: ["安大略省", "Ontario"],
   inquiry: ["询盘", "Inquiry"], requirement: ["需求确认", "Requirement"], sample: ["样品", "Sample"], quotation: ["报价", "Quotation"], negotiation: ["谈判", "Negotiation"], po: ["采购订单", "PO"], delivery: ["交付", "Delivery"], shipment: ["出货", "Shipment"],
   新询盘: ["新询盘", "New Inquiry"], 需求确认: ["需求确认", "Requirement Confirmation"], 打样中: ["打样中", "Sampling"], 报价中: ["报价中", "Quoting"], 谈判中: ["谈判中", "Negotiating"], 已确认订单: ["已确认订单", "PO Confirmed"], 暂停或流失: ["暂停或流失", "Paused / Lost"],
   待制作: ["待制作", "To Produce"], 制作中: ["制作中", "In Development"], 已完成: ["已完成", "Completed"], 已寄出: ["已寄出", "Sent"], 客户评估中: ["客户评估中", "Client Evaluation"], 需修改: ["需修改", "Revision Required"], 已确认: ["已确认", "Approved"], 已关闭: ["已关闭", "Closed"],

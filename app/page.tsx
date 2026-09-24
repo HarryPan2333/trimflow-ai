@@ -7,12 +7,26 @@ import "../components/products/product-workspace.css";
 import "../components/theme/steep-editorial.css";
 import "../components/accounts/account-workspace.css";
 import "../components/deal-room/deal-room.css";
+import "../components/reports/report-workspace.css";
 
-import { useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { EmptyState } from "../components/business/empty-state";
 import { AccountCenter, type ProspectInput } from "../components/accounts/account-center";
 import { AccountWorkspace, type AccountTab } from "../components/accounts/account-workspace";
 import { DealRoomWorkspace } from "../components/deal-room/deal-room-workspace";
+import { ReportsCenter } from "../components/reports/reports-center";
+import { TaskList } from "../components/tasks/task-list";
+import { createTaskWorkspace, createWorkspaceTask, changeTaskStatus, type WorkspaceTask } from "../lib/tasks/workspace";
+import { adaptSources, type BusinessSources } from "../lib/activity-memory/source-adapters";
+import { emptyActivityMemory, reconcileMemory } from "../lib/activity-memory/projection";
+import { addManualActivity } from "../lib/activity-memory/commands";
+import type { ActivityMemoryItem, ManualActivityEntry } from "../lib/activity-memory/types";
+import { createReportContext } from "../lib/reports/context";
+import { DemoReportGenerator } from "../lib/reports/generator";
+import { addReportHumanNote, editReportBlock, finalizeReport, generateReport, reviewReport } from "../lib/reports/commands";
+import { emptyReportState, type AttributionMode, type ReportKind, type ReportLanguage } from "../lib/reports/types";
+import { createReportPeriod, DEMO_REPORT_DATE, DEMO_REPORT_TIME_ZONE } from "../lib/reports/period";
+import { selectMemory } from "../lib/activity-memory/selectors";
 import { createDealRoomState } from "../lib/deal-room/repository";
 import { createRoom } from "../lib/deal-room/commands";
 import { applyReviewedProposal } from "../lib/deal-room/apply";
@@ -55,9 +69,10 @@ import { useI18n } from "../components/providers/language-provider";
 import {
   projects as initialProjects,
   projectStages as stages,
-  tasks as mockTasks,
+  communications as caseCommunications,
+  timelineEvents as caseTimeline,
 } from "../lib/mock-data";
-import type { Project, ProjectStage as Stage } from "../lib/mock-data";
+import type { Project, ProjectStage as Stage, TimelineEvent } from "../lib/mock-data";
 import type { LocalizedText } from "../lib/i18n";
 
 type OutputLanguage = "中文" | "英文" | "中英对照";
@@ -179,6 +194,11 @@ function ProjectDetail({
   project,
   accountState,
   dealRoomState,
+  sharedTasks,
+  projectActivities,
+  onAddProjectActivity,
+  recentMemory,
+  onOpenReports,
   onOpenDealRoom,
   onCreateDealRoom,
   onBack,
@@ -200,6 +220,11 @@ function ProjectDetail({
   project: Project;
   accountState: AccountState;
   dealRoomState: DealRoomState;
+  sharedTasks: WorkspaceTask[];
+  projectActivities: TimelineEvent[];
+  onAddProjectActivity: (event: TimelineEvent) => void;
+  recentMemory: ActivityMemoryItem[];
+  onOpenReports: () => void;
   onOpenDealRoom: (id: string) => void;
   onCreateDealRoom: (accountId: string, projectId?: number) => void;
   onBack: () => void;
@@ -224,6 +249,11 @@ function ProjectDetail({
       project={project}
       accountState={accountState}
       dealRoomState={dealRoomState}
+      sharedTasks={sharedTasks}
+      projectActivities={projectActivities}
+      onAddProjectActivity={onAddProjectActivity}
+      recentMemory={recentMemory}
+      onOpenReports={onOpenReports}
       onOpenDealRoom={onOpenDealRoom}
       onCreateDealRoom={onCreateDealRoom}
       stages={stages}
@@ -335,34 +365,6 @@ function AIAssistant({ project, showToast }: { project: Project; showToast: (s: 
   );
 }
 
-function Todos({ showToast, dealTasks = [], accountState }: { showToast: (s: string) => void; dealTasks?: DealRoomState["tasks"]; accountState: AccountState }) {
-  const { language, t, text } = useI18n();
-  const [done, setDone] = useState<number[]>([3]);
-  const tasks: Array<{ priority: string; title: LocalizedText; client: string | LocalizedText; due: LocalizedText; owner: string; today?: boolean }> = [
-    { priority: "P1", title: { zh: "跟进 NAS-2407 样品测试安排", en: "Follow up on the NAS-2407 sample testing schedule" }, client: "North American Sportswear Brand", due: { zh: "今天 10:30", en: "Today, 10:30 AM" }, owner: "陈晨", today: true },
-    { priority: "P1", title: { zh: "完成 EFC-2411 测试费与模具费说明", en: "Complete the EFC-2411 testing and tooling fee explanation" }, client: "European Fashion Client", due: { zh: "今天 14:00", en: "Today, 2:00 PM" }, owner: "王璐", today: true },
-    { priority: "P2", title: { zh: "发送瑜伽系列产品规格确认表", en: "Send the yoga collection specification confirmation sheet" }, client: "Emerging Yoga Wear Brand", due: { zh: "今天 17:00", en: "Today, 5:00 PM" }, owner: "林薇", today: true },
-    { priority: "P2", title: { zh: "整理户外客户的三档数量报价", en: "Prepare three volume tiers for the outdoor client" }, client: "Outdoor Clothing Client", due: { zh: "明天", en: "Tomorrow" }, owner: "陈晨" },
-    { priority: "P3", title: { zh: "更新本周项目周报", en: "Update this week's project report" }, client: { zh: "全部项目", en: "All Projects" }, due: { zh: "周五 16:00", en: "Friday, 4:00 PM" }, owner: "陈晨" },
-  ];
-  return <><PageHeader title={t("tasks.title")} subtitle={t("tasks.subtitle")} actions={<Button>＋ {t("tasks.add")}</Button>} /><div className="todo-summary"><Card><span>{t("tasks.todayDue")}</span><strong>3</strong></Card><Card><span>{t("tasks.weekTotal")}</span><strong>9</strong></Card><Card><span>{t("tasks.completed")}</span><strong>6</strong></Card><Card><span>{t("tasks.overdue")}</span><strong className="red-text">1</strong></Card></div><Card><div className="card-head"><div><h2>{t("tasks.myTasks")}</h2><p>{t("tasks.sortHelp")}</p></div><div className="segment"><button className="active">{t("common.all")}</button><button>{t("tasks.today")}</button><button>{t("tasks.filterWeek")}</button></div></div><div className="task-list">{tasks.map((task, i) => <div className={`task-row ${done.includes(i) ? "task-done" : ""}`} key={text(task.title)}><button className="task-check" onClick={() => { setDone((x) => x.includes(i) ? x.filter((n) => n !== i) : [...x, i]); showToast(done.includes(i) ? t("toast.taskRestored") : t("toast.taskCompleted")); }}>{done.includes(i) ? "✓" : ""}</button><span className={task.priority === "P1" ? "priority p1" : "priority"}>{task.priority}</span><div className="task-main"><strong>{text(task.title)}</strong><small>{text(task.client)}</small></div><span>{task.owner}</span><Badge tone={task.today ? "red" : "neutral"}>{text(task.due)}</Badge><button className="icon-btn">⋯</button></div>)}{dealTasks.map((task) => <div className="task-row" key={task.id}><span className="task-check">○</span><span className="priority p2">{task.priority}</span><div className="task-main"><strong>{task.title}</strong><small>{task.accountId} · {task.sourceMessageIds.join(", ")}</small></div><span>{accountState.actors.find((actor) => actor.id === task.ownerActorId)?.displayName[language] ?? task.owner}</span><Badge>{task.dueDate || "—"}</Badge></div>)}</div></Card></>;
-}
-
-function Reports({ showToast }: { showToast: (s: string) => void }) {
-  const { t, label, text } = useI18n();
-  const [outputLanguage, setOutputLanguage] = useState<OutputLanguage>("中文");
-  const sections = [
-    [t("reports.completed"), { zh: "完成 V2 防水拉链样品制作并于 7 月 24 日寄出；客户已签收。", en: "Completed the V2 waterproof zipper samples, shipped them on July 24, and received client delivery confirmation." }],
-    [t("reports.clientFeedback"), { zh: "客户将优先测试 64 cm 黑色款，预计本周四提供初步结果。", en: "The client will test the 64 cm black version first and expects to share initial results this Thursday." }],
-    [t("reports.sampleProgress"), { zh: "膜面光泽与灰色色差已按 V1 反馈调整，V2 进入客户测试。", en: "Film gloss and the gray color difference were adjusted from V1 feedback; V2 is now under client testing." }],
-    [t("reports.quoteProgress"), { zh: "正在准备 80K / 120K / 200K 三档模拟报价，基础参考价为 USD 0.88 / 条。", en: "Synthetic quotation tiers for 80K / 120K / 200K units are in preparation, with a recorded reference of USD 0.88 per piece." }],
-    [t("reports.risks"), { zh: "客户与技术部对洗后测试次数的口径不一致，可能影响成本与交期。", en: "The client and technical team are not aligned on the number of post-wash test cycles, which may affect cost and lead time." }],
-    [t("reports.openIssues"), { zh: "确认测试标准、Logo 图稿、目标价格及各长度数量占比。", en: "Confirm the testing standard, logo artwork, target price, and volume split by length." }],
-    [t("reports.nextWeek"), { zh: "取得测试反馈；完成阶梯报价；推进 Logo 与包装要求确认。", en: "Obtain test feedback, complete tiered pricing, and confirm logo and packaging requirements." }],
-    [t("reports.support"), { zh: "如客户坚持 5 次水洗标准，需技术总监确认新膜材方案与价格底线。", en: "If the client requires five wash cycles, the technical director must confirm the new film solution and pricing boundary." }],
-  ];
-  return <><PageHeader title={t("reports.title")} subtitle={t("reports.subtitle")} actions={<span className="week-picker">‹　{t("reports.period")}　›</span>} /><div className="report-toolbar card"><div><span>{t("reports.language")}</span><div className="segment">{(["中文", "英文", "中英对照"] as OutputLanguage[]).map((option) => <button key={option} className={outputLanguage === option ? "active" : ""} onClick={() => setOutputLanguage(option)}>{label(option)}</button>)}</div></div><div className="page-actions"><Button variant="secondary" onClick={() => showToast(t("toast.reportCopied"))}>{t("reports.copyContent")}</Button><Button variant="secondary" onClick={() => showToast(t("toast.reportExported"))}>{t("reports.exportMarkdown")}</Button><Button onClick={() => showToast(t("toast.reportRegenerated", { language: label(outputLanguage) }))}>✦ {t("reports.regenerate")}</Button></div></div><div className="report-grid">{initialProjects.slice(0, 3).map((p, idx) => <Card className="report-card" key={p.id}><div className="report-card-head"><div className="detail-title"><span className="client-avatar" style={{ background: p.color }}>{p.initials}</span><div><span className="project-code">{p.code}</span><h2>{text(p.name)}</h2><p>{text(p.customer)}</p></div></div><StatusBadge status={p.stage} /></div><div className="report-sections">{sections.map(([title, body], sidx) => <div key={String(title)}><strong>{String(title)}</strong><p>{idx === 1 && sidx === 0 ? text({ zh: "已提交 V2 阶梯报价，并补充报价有效期说明。", en: "Submitted the V2 tiered quotation and clarified its validity period." }) : idx === 2 && sidx === 0 ? text({ zh: "已整理客户概念板和初步产品组合。", en: "Organized the client concept board and initial product assortment." }) : text(body as LocalizedText)}</p></div>)}</div><div className="report-footer"><span>✦ {t("reports.mockGenerated")}</span><div><button onClick={() => showToast(t("toast.reportCopied"))}>{t("reports.copy")}</button><button>{t("reports.edit")}</button></div></div></Card>)}</div></>;
-}
 
 function SimplePage({ type }: { type: "templates" | "settings" }) {
   const { t, label, text } = useI18n();
@@ -386,6 +388,11 @@ export default function Home() {
   const accountStateRef = useRef(accountState);
   const [dealRoomState, setDealRoomState] = useState(createDealRoomState);
   const dealRoomRef = useRef(dealRoomState);
+  const [taskWorkspace, setTaskWorkspace] = useState(createTaskWorkspace);
+  const [projectActivities, setProjectActivities] = useState<TimelineEvent[]>([]);
+  const [memoryState, setMemoryState] = useState(emptyActivityMemory);
+  const [reportState, setReportState] = useState(emptyReportState);
+  const [reportInitialTab, setReportInitialTab] = useState<"daily" | "weekly" | "evidence">("daily");
   const [activeRoomId, setActiveRoomId] = useState("room-nas-project");
   const [dealReturnView, setDealReturnView] = useState<"account-detail" | "detail">("account-detail");
   const [activeAccountId, setActiveAccountId] = useState("client-nas");
@@ -404,6 +411,18 @@ export default function Home() {
   const [projectTab, setProjectTab] = useState<"overview" | "samples" | "quotations" | "orders">("overview");
   const [newProject, setNewProject] = useState(false);
   const [toast, setToast] = useState("");
+  const businessSources: BusinessSources = useMemo(() => ({ accounts: accountState, dealRoom: dealRoomState, projects, projectActivities,
+    timeline: caseTimeline, communications: caseCommunications, samples: { versions: sampleWorkspace.versions, feedback: sampleWorkspace.feedback },
+    quotations: quotationWorkspace.quotations, negotiations: quotationWorkspace.records, orders: orderWorkspace.orders, contracts: orderWorkspace.contracts,
+    deliveries: orderWorkspace.deliveries, shipments: orderWorkspace.shipments, tasks: taskWorkspace, products: productLibrary, manualEntries: memoryState.manualEntries,
+  }), [accountState, dealRoomState, projects, projectActivities, sampleWorkspace, quotationWorkspace, orderWorkspace, taskWorkspace, productLibrary, memoryState.manualEntries]);
+  const memoryCandidates = useMemo(() => adaptSources(businessSources, new Date().toISOString()), [businessSources]);
+  const projectedMemory = useMemo(() => reconcileMemory(memoryState, memoryCandidates), [memoryState, memoryCandidates]);
+  const dashboardActivityCount = useMemo(() => selectMemory(projectedMemory.items, businessSources, { start: DEMO_REPORT_DATE, end: "2026-08-06", timeZone: DEMO_REPORT_TIME_ZONE, ownerActorId: "actor-sales-a" }).filter((row) => row.eligible).length, [projectedMemory.items, businessSources]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMemoryState((current) => reconcileMemory(current, memoryCandidates)), 0);
+    return () => window.clearTimeout(timer);
+  }, [memoryCandidates]);
   const embedded = useSyncExternalStore(subscribeToLocation, readEmbeddedMode, readServerEmbeddedMode);
   const showToast = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(""), 2500); };
   const commitAccounts = (next: AccountState) => { accountStateRef.current = next; setAccountState(next); };
@@ -434,6 +453,8 @@ export default function Home() {
     try {
       const result = applyReviewedProposal(dealRoomRef.current, proposalId, { accounts: accountStateRef.current, projects, samples: sampleWorkspace, actorId, at: new Date().toISOString() });
       if (result.alreadyApplied) { showToast(t("deal.applied")); return false; }
+      const createdTasks = result.dealRoom.tasks.filter((item) => !dealRoomRef.current.tasks.some((prior) => prior.id === item.id));
+      if (createdTasks.length) setTaskWorkspace((current) => createdTasks.reduce((state, task) => createWorkspaceTask(state, { ...task, origin: "deal_room" }, actorId, new Date().toISOString(), `deal-${proposalId}`, [{ provider: "trimflow", recordType: "deal_proposal", recordId: proposalId }, ...task.sourceMessageIds.map((id) => ({ provider: "trimflow" as const, recordType: "deal_message", recordId: id }))]), current));
       commitDealRoom(result.dealRoom);
       commitAccounts(result.accounts);
       if (result.sampleFeedback) dispatchSample({ type: "feedback", feedback: result.sampleFeedback });
@@ -538,6 +559,39 @@ export default function Home() {
     setLanguage(nextLanguage);
     showToast(nextLanguage === "zh" ? t("toast.languageZh") : t("toast.languageEn"));
   };
+  const createTask = (task: WorkspaceTask, actorId: string) => {
+    try {
+      if (projects.find((item) => item.id === task.projectId)?.clientId !== task.accountId) throw new Error("Task scope mismatch");
+      setTaskWorkspace((current) => createWorkspaceTask(current, task, actorId, new Date().toISOString(), `create-${task.id}`));
+      showToast(t("report.saveSuccess"));
+    } catch (error) { showToast(error instanceof Error ? error.message : String(error)); }
+  };
+  const toggleTask = (taskId: string, actorId: string) => {
+    const task = taskWorkspace.tasks.find((row) => row.id === taskId);
+    if (!task) return;
+    const toStatus = task.status === "已完成" ? "待处理" : "已完成";
+    try { setTaskWorkspace((current) => changeTaskStatus(current, taskId, toStatus, actorId, new Date().toISOString(), crypto.randomUUID())); showToast(toStatus === "已完成" ? t("toast.taskCompleted") : t("toast.taskRestored")); }
+    catch (error) { showToast(error instanceof Error ? error.message : String(error)); }
+  };
+  const generateActivityReport = (input: { kind: ReportKind; date: string; timeZone: string; ownerActorId: string; attributionMode: AttributionMode; language: ReportLanguage; accountId?: string; projectId?: number; fromReportId?: string }) => {
+    try {
+      const now = new Date().toISOString();
+      const context = createReportContext({ id: `context:${crypto.randomUUID()}`, ownerActorId: input.ownerActorId, attributionMode: input.attributionMode, period: createReportPeriod(input.kind, input.date, input.timeZone), language: input.language, accountId: input.accountId, projectId: input.projectId, capturedAt: now }, projectedMemory.items, businessSources);
+      const result = generateReport(reportState, context, new DemoReportGenerator(), now, input.fromReportId);
+      setReportState(result.state);
+      showToast(t("report.generateSuccess"));
+      return result.draft.id;
+    } catch (error) { showToast(error instanceof Error ? error.message : String(error)); return undefined; }
+  };
+  const updateReport = (command: (current: typeof reportState) => typeof reportState, success: string) => {
+    try { setReportState(command(reportState)); showToast(success); }
+    catch (error) { showToast(error instanceof Error ? error.message : String(error)); }
+  };
+  const addManual = (entry: ManualActivityEntry) => {
+    try { setMemoryState((current) => addManualActivity(current, entry)); showToast(t("report.saveSuccess")); }
+    catch (error) { showToast(error instanceof Error ? error.message : String(error)); }
+  };
+  const copyReport = (content: string) => { void navigator.clipboard?.writeText(content).then(() => showToast(t("report.copySuccess"))).catch(() => showToast(t("report.invalid"))); };
   const handleGlobalCreate = (type: GlobalCreateType) => {
     if (type === "project") {
       setNewProject(true);
@@ -563,27 +617,27 @@ export default function Home() {
         activeView={activeNav}
         currentTitle={title}
         language={language}
-        todoCount={mockTasks.filter((task) => task.status !== "已完成").length}
+        todoCount={taskWorkspace.tasks.filter((task) => task.status !== "已完成").length}
         onNavigate={setView}
         onLanguageChange={changeLanguage}
         onGlobalCreate={handleGlobalCreate}
       >
-          {view === "dashboard" && <DashboardView projects={projects} accountState={accountState} onOpenProject={openProject} onNavigate={setView} onOpenNewProject={() => setNewProject(true)} />}
+          {view === "dashboard" && <DashboardView projects={projects} accountState={accountState} sharedTasks={taskWorkspace.tasks} reportableToday={dashboardActivityCount} dailyReportStatus={reportState.drafts.filter((row) => row.kind === "daily").at(-1)?.status} weeklyReportStatus={reportState.drafts.filter((row) => row.kind === "weekly").at(-1)?.status} onOpenReports={() => { setReportInitialTab("daily"); setView("reports"); }} onOpenProject={openProject} onNavigate={setView} onOpenNewProject={() => setNewProject(true)} />}
           {view === "clients" && <AccountCenter state={accountState} business={{ projects, products: productLibrary, samples: sampleWorkspace, quotations: quotationWorkspace, orders: orderWorkspace }} onOpen={openAccount} onCreate={createProspect} onResolve={resolveDuplicate} onRequest={requestAccountCollaboration} showToast={showToast} />}
-          {view === "account-detail" && <AccountWorkspace key={`${activeAccountId}-${accountTab}`} state={accountState} accountId={activeAccountId} initialTab={accountTab} business={{ projects, products: productLibrary, samples: sampleWorkspace, quotations: quotationWorkspace, orders: orderWorkspace }} dealRoomState={dealRoomState} onOpenDealRoom={(id) => openDealRoom(id, "account-detail")} onCreateDealRoom={() => createDealRoom(activeAccountId)} onBack={() => setView("clients")} onOpenProject={(id) => { const p = projects.find((item) => item.id === id); if (p) openProject(p); }} execute={executeAccount} />}
+          {view === "account-detail" && <AccountWorkspace key={`${activeAccountId}-${accountTab}`} state={accountState} accountId={activeAccountId} initialTab={accountTab} business={{ projects, products: productLibrary, samples: sampleWorkspace, quotations: quotationWorkspace, orders: orderWorkspace }} dealRoomState={dealRoomState} onOpenDealRoom={(id) => openDealRoom(id, "account-detail")} onCreateDealRoom={() => createDealRoom(activeAccountId)} recentMemory={projectedMemory.items.filter((item) => item.accountId === activeAccountId && item.status === "active").slice(-3).reverse()} onOpenReports={() => { setReportInitialTab("evidence"); setView("reports"); }} onBack={() => setView("clients")} onOpenProject={(id) => { const p = projects.find((item) => item.id === id); if (p) openProject(p); }} execute={executeAccount} />}
           {view === "projects" && <Projects projects={projects} openProject={openProject} openNew={() => setNewProject(true)} />}
           {view === "products" && <ProductLibrary data={productLibrary} onOpen={openProduct} />}
           {view === "product-detail" && activeProductId && <ProductLibraryDetail key={activeProductId} data={productLibrary} productId={activeProductId} onBack={() => setView(productReturnView === "product-detail" ? "products" : productReturnView)} onAdd={(id, variantId) => setProductToAdd({ id, variantId })} />}
-          {view === "detail" && <ProjectDetail project={activeProject} accountState={accountState} dealRoomState={dealRoomState} onOpenDealRoom={(id) => openDealRoom(id, "detail")} onCreateDealRoom={createDealRoom} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} orderWorkspace={orderWorkspace} productLibrary={productLibrary} onBrowseProducts={() => setView("products")} onOpenProduct={openProduct} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} onOpenOrder={openOrder} language={language} initialTab={projectTab} />}
-          {view === "deal-room" && <DealRoomWorkspace key={activeRoomId} state={dealRoomState} accounts={accountState} projects={projects} samples={sampleWorkspace} quotations={quotationWorkspace} roomId={activeRoomId} onRoomChange={setActiveRoomId} onBack={() => setView(dealReturnView)} onAccount={openAccount} onProject={openProject} run={executeDealRoom} onApply={applyDealProposal} />}
+          {view === "detail" && <ProjectDetail project={activeProject} accountState={accountState} dealRoomState={dealRoomState} sharedTasks={taskWorkspace.tasks} projectActivities={projectActivities} onAddProjectActivity={(event) => setProjectActivities((current) => [event, ...current])} recentMemory={projectedMemory.items.filter((item) => item.projectId === activeProject.id && item.status === "active").slice(-3).reverse()} onOpenReports={() => setView("reports")} onOpenDealRoom={(id) => openDealRoom(id, "detail")} onCreateDealRoom={createDealRoom} onBack={() => setView("projects")} updateStage={updateStage} showToast={showToast} sampleWorkspace={sampleWorkspace} quotationWorkspace={quotationWorkspace} orderWorkspace={orderWorkspace} productLibrary={productLibrary} onBrowseProducts={() => setView("products")} onOpenProduct={openProduct} onOpenSample={openSample} onOpenQuotation={openQuotation} onCreateQuotation={() => createForProject(activeProject)} onOpenOrder={openOrder} language={language} initialTab={projectTab} />}
+          {view === "deal-room" && <DealRoomWorkspace key={activeRoomId} state={dealRoomState} accounts={accountState} projects={projects} samples={sampleWorkspace} quotations={quotationWorkspace} roomId={activeRoomId} onRoomChange={setActiveRoomId} onBack={() => setView(dealReturnView)} onAccount={openAccount} onProject={openProject} run={executeDealRoom} onApply={applyDealProposal} onOpenActivity={() => { setReportInitialTab("evidence"); setView("reports"); }} />}
           {view === "samples" && <SampleCenter workspace={sampleWorkspace} projects={projects} accountState={accountState} onOpenSample={openSample} language={language} />}
           {view === "sample-detail" && activeSample && <SampleDetail key={activeSample.id} context={getSampleContext(activeSample, sampleWorkspace, projects, accountState)} language={language} dispatch={dispatchSample} onBack={() => setView("samples")} onProject={() => { const p = projects.find((project) => project.id === activeSample.projectId); if (p) openProject(p, "samples"); }} onClient={() => openAccount(activeSample.clientId)} onCreateQuotation={() => createOrOpenQuotation(activeSample.id)} showToast={showToast} />}
           {view === "quotations" && <QuotationCenter workspace={quotationWorkspace} projects={projects} accountState={accountState} language={language} onOpenQuotation={openQuotation} onCreate={() => createForProject(activeProject)} />}
           {view === "quotation-detail" && activeQuotation && <QuotationDetail key={activeQuotation.id} context={getQuotationContext(activeQuotation, quotationWorkspace, projects, accountState)} language={language} dispatch={dispatchQuotation} onBack={() => setView("quotations")} onProject={() => { const p = projects.find((project) => project.id === activeQuotation.projectId); if (p) openProject(p, "quotations"); }} onSample={openSample} onOpenVersion={openQuotation} onCreatePO={() => createOrOpenOrder(activeQuotation.id)} showToast={showToast} />}
           {view === "orders" && <OrderCenter workspace={orderWorkspace} quotationWorkspace={quotationWorkspace} projects={projects} accountState={accountState} language={language} onOpenOrder={openOrder} />}
           {view === "order-detail" && activeOrder && <OrderDetail key={activeOrder.id} context={getOrderContext(activeOrder, orderWorkspace, quotationWorkspace, projects, accountState)} language={language} dispatch={dispatchOrder} onBack={() => setView("orders")} onClient={() => openAccount(activeOrder.clientId)} onProject={() => { const p = projects.find((project) => project.id === activeOrder.projectId); if (p) openProject(p, "orders"); }} onQuotation={() => openQuotation(activeOrder.quotationId)} showToast={showToast} />}
-          {view === "todos" && <Todos showToast={showToast} dealTasks={dealRoomState.tasks} accountState={accountState} />}
-          {view === "reports" && <Reports showToast={showToast} />}
+          {view === "todos" && <TaskList state={taskWorkspace} accounts={accountState} projects={projects} onCreate={createTask} onToggle={toggleTask} />}
+          {view === "reports" && <ReportsCenter sources={businessSources} items={projectedMemory.items} state={reportState} initialTab={reportInitialTab} onGenerate={generateActivityReport} onEdit={(id, blockId, value) => updateReport((current) => editReportBlock(current, id, blockId, value, new Date().toISOString()), t("report.saveSuccess"))} onNote={(id, value) => updateReport((current) => addReportHumanNote(current, id, value, new Date().toISOString()), t("report.saveSuccess"))} onReview={(id, actorId) => updateReport((current) => reviewReport(current, id, actorId, new Date().toISOString()), t("report.reviewSuccess"))} onFinalize={(id, actorId) => updateReport((current) => finalizeReport(current, id, actorId, new Date().toISOString()).state, t("report.finalSuccess"))} onManual={addManual} onCopy={copyReport} />}
           {view === "ai" && <><PageHeader title={t("ai.title")} subtitle={language === "zh" ? `当前关联项目：${activeProject.code} · ${activeProject.name}` : `Current project: ${activeProject.code} · ${label(activeProject.name)}`} /><AIAssistant project={activeProject} showToast={showToast} /></>}
           {(view === "templates" || view === "settings") && <SimplePage type={view} />}
           {isPlaceholder && <EmptyState title={title} description={t("errors.modulePending")} />}

@@ -37,7 +37,7 @@ export const workspaceNavigation: Array<{
   { id: "orders", key: "nav.orders", label: "订单中心", en: "Order Center", icon: "▤", placement: "primary" },
   { id: "fulfillment", key: "nav.fulfillment", label: "交付与出货", en: "Delivery & Shipment", icon: "↗", placement: "primary" },
   { id: "todos", key: "nav.todos", label: "待办事项", en: "Tasks", icon: "✓", placement: "primary" },
-  { id: "reports", key: "nav.reports", label: "周报中心", en: "Weekly Reports", icon: "▥", placement: "primary" },
+  { id: "reports", key: "nav.reports", label: "报告中心", en: "Reports", icon: "▥", placement: "primary" },
   { id: "ai", key: "nav.ai", label: "AI 助手", en: "AI Assistant", icon: "✦", placement: "primary" },
   { id: "templates", key: "nav.templates", label: "模板中心", en: "Templates", icon: "▧", placement: "bottom" },
   { id: "settings", key: "nav.settings", label: "设置", en: "Settings", icon: "⚙", placement: "bottom" },

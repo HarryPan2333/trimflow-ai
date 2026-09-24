@@ -26,6 +26,8 @@ import { getProjectProducts, getProductById } from "../../lib/product-library/se
 import type { AccountState } from "../../lib/accounts/types";
 import type { DealRoomState } from "../../lib/deal-room/types";
 import { DealRoomEntry } from "../deal-room/deal-room-entry";
+import type { WorkspaceTask } from "../../lib/tasks/workspace";
+import type { ActivityMemoryItem } from "../../lib/activity-memory/types";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
@@ -35,6 +37,11 @@ type ProjectCommandCenterProps = {
   project: Project;
   accountState?: AccountState;
   dealRoomState: DealRoomState;
+  sharedTasks: WorkspaceTask[];
+  projectActivities: TimelineEvent[];
+  onAddProjectActivity: (event: TimelineEvent) => void;
+  recentMemory: ActivityMemoryItem[];
+  onOpenReports: () => void;
   onOpenDealRoom: (id: string) => void;
   onCreateDealRoom: (accountId: string, projectId?: number) => void;
   stages: ProjectStage[];
@@ -56,7 +63,7 @@ type ProjectCommandCenterProps = {
   initialTab?: "overview" | "samples" | "quotations" | "orders";
 };
 
-export function ProjectCommandCenter({ project, accountState, dealRoomState, onOpenDealRoom, onCreateDealRoom, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+export function ProjectCommandCenter({ project, accountState, dealRoomState, sharedTasks, projectActivities, onAddProjectActivity, recentMemory, onOpenReports, onOpenDealRoom, onCreateDealRoom, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
   const { language: appLanguage, t, text } = useI18n();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
@@ -66,15 +73,14 @@ export function ProjectCommandCenter({ project, accountState, dealRoomState, onO
     const quoteIds = new Set(projectQuotes.map((item) => item.id));
     const projectOrders = orderWorkspace.orders.filter((item) => item.projectId === project.id);
     const orderIds = new Set(projectOrders.map((item) => item.id));
-    return { ...base, requirements: base.requirements.map((item) => dealRoomState.requirements.find((update) => update.id === item.id) ?? item), tasks: [...base.tasks, ...dealRoomState.tasks.filter((item) => item.projectId === project.id)], samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id), purchaseOrders: projectOrders, orderLines: orderWorkspace.lines.filter((item) => orderIds.has(item.purchaseOrderId)), contracts: orderWorkspace.contracts.filter((item) => item.projectId === project.id), deliveries: orderWorkspace.deliveries.filter((item) => item.projectId === project.id), shipments: orderWorkspace.shipments.filter((item) => item.projectId === project.id) };
-  }, [accountState, dealRoomState, orderWorkspace, project, quotationWorkspace, sampleWorkspace]);
-  const [localEvents, setLocalEvents] = useState<TimelineEvent[]>(data.timeline);
+    return { ...base, requirements: base.requirements.map((item) => dealRoomState.requirements.find((update) => update.id === item.id) ?? item), tasks: sharedTasks.filter((item) => item.projectId === project.id), samples: sampleWorkspace.samples.filter((item) => item.projectId === project.id), sampleVersions: sampleWorkspace.versions.filter((item) => item.projectId === project.id), sampleFeedback: sampleWorkspace.feedback.filter((item) => item.projectId === project.id), quotations: projectQuotes, quotationTiers: quotationWorkspace.tiers.filter((item) => quoteIds.has(item.quotationId)), negotiationRecords: quotationWorkspace.records.filter((item) => item.projectId === project.id), purchaseOrders: projectOrders, orderLines: orderWorkspace.lines.filter((item) => orderIds.has(item.purchaseOrderId)), contracts: orderWorkspace.contracts.filter((item) => item.projectId === project.id), deliveries: orderWorkspace.deliveries.filter((item) => item.projectId === project.id), shipments: orderWorkspace.shipments.filter((item) => item.projectId === project.id) };
+  }, [accountState, dealRoomState, orderWorkspace, project, quotationWorkspace, sampleWorkspace, sharedTasks]);
   const accountEvents: TimelineEvent[] = (accountState?.activities ?? []).filter((item) => item.projectId === project.id && item.id.startsWith("activity-proposal-")).map((item) => ({
     id: `deal-${item.id}`, projectId: project.id, clientId: project.clientId, type: "communication",
     occurredAt: item.occurredAt, displayDate: item.occurredAt.slice(0, 10), title: item.title[appLanguage],
     description: item.detail[appLanguage], icon: "◎", actor: accountState?.actors.find((actor) => actor.id === item.actorId)?.displayName[appLanguage],
   }));
-  const displayedEvents = [...localEvents, ...accountEvents].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+  const displayedEvents = [...data.timeline, ...projectActivities.filter((item) => item.projectId === project.id), ...accountEvents].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   const priority = getOpportunityPriority(data, appLanguage);
   const opportunity = getCommercialOpportunity(data, appLanguage);
 
@@ -84,7 +90,7 @@ export function ProjectCommandCenter({ project, accountState, dealRoomState, onO
     const type = String(form.get("type")) as TimelineEvent["type"];
     const content = String(form.get("content"));
     const newEvent: TimelineEvent = { id: `local-${Date.now()}`, projectId: project.id, clientId: project.clientId, type, occurredAt: new Date().toISOString(), displayDate: appLanguage === "zh" ? "刚刚" : "Just now", title: String(form.get("title")) || (appLanguage === "zh" ? "新增项目活动" : "New project activity"), description: content, icon: type === "sample" ? "◈" : type === "quotation" ? "¥" : type === "task" ? "✓" : "✉" };
-    setLocalEvents((current) => [newEvent, ...current]);
+    onAddProjectActivity(newEvent);
     setActivityModal(false);
     showToast(appLanguage === "zh" ? "项目活动已添加（模拟）" : "Project activity added (demo)");
   };
@@ -93,6 +99,7 @@ export function ProjectCommandCenter({ project, accountState, dealRoomState, onO
     <div className="project-command-center">
       <ProjectHeader data={data} priority={priority} expectedValue={opportunity.estimatedValue} stages={stages} onBack={onBack} onUpdateStage={onUpdateStage} onAddActivity={() => setActivityModal(true)} onCreateSample={() => { setTab("samples"); showToast(appLanguage === "zh" ? "已打开项目样品；选择样品可创建后续版本" : "Project samples opened; select a sample to create a revision"); }} onCreateQuote={() => { setTab("quotations"); if (data.quotations.length) showToast(appLanguage === "zh" ? "已打开项目报价；点击记录进入谈判工作区" : "Project quotations opened; select a record to enter negotiation"); else onCreateQuotation(); }} onEditProject={() => showToast(appLanguage === "zh" ? "编辑项目为当前原型模拟操作" : "Edit project is a demo action")} />
       {accountState && <DealRoomEntry state={dealRoomState} accounts={accountState} accountId={project.clientId} projectId={project.id} onOpen={onOpenDealRoom} onCreate={() => onCreateDealRoom(project.clientId, project.id)} />}
+      <Card className="report-bridge"><div><h3>{t("report.recentActivity")}</h3><p>{recentMemory.length ? `${recentMemory.length} · ${text(recentMemory[0].summary)}` : t("report.empty")}</p></div><Button variant="secondary" onClick={onOpenReports}>{t("report.openReports")} →</Button></Card>
 
       <Card className="project-lifecycle-card">
         <div className="lifecycle-card-head"><div><span>Lifecycle Control</span><strong>{t("project.lifecycleControl")}</strong></div><StatusBadge status={project.lifecycleStage} /></div>

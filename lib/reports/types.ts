@@ -1,0 +1,25 @@
+import type { LocalizedText } from "../i18n";
+import type { ActivityMemoryItem, EvidenceReference, SourceRecordRef } from "../activity-memory/types";
+
+export type ReportKind = "daily" | "weekly";
+export type ReportLanguage = "zh" | "en" | "bilingual";
+export type AttributionMode = "personal" | "team";
+export type ReportPeriod = { kind: ReportKind; timeZone: string; localStartDate: string; localEndDate: string; startInclusive: string; endExclusive: string };
+export type ReportContextSnapshot = { id: string; ownerActorId: string; attributionMode: AttributionMode; period: ReportPeriod; language: ReportLanguage; accountId?: string; projectId?: number;
+  memory: ActivityMemoryItem[]; evidence: EvidenceReference[]; openTasks: Array<{ id: string; title: string; accountId: string; projectId: number; dueDate: string; source: SourceRecordRef }>;
+  entityLabels: Record<string, LocalizedText>; sourceCount: number; excludedSourceCount: number; capturedAt: string; generatorVersion: string };
+export type ReportBlock = { id: string; kind: "fact" | "interpretation" | "recommendation" | "human_note"; text: LocalizedText;
+  memoryRevisionIds: string[]; factIds: string[]; origin: "demo_generator" | "human" | "llm"; validation: "valid" | "needs_review" | "blocked";
+  actionKind?: "existing_task" | "suggested_action"; actionSource?: SourceRecordRef; aggregateCount?: number };
+export type ReportSection = { id: string; title: LocalizedText; blocks: ReportBlock[] };
+export type ReportValidation = { issues: string[]; warnings: string[]; validatedAt: string };
+export type ReportDraft = { id: string; lineageId: string; revision: number; kind: ReportKind; ownerActorId: string; attributionMode: AttributionMode; period: ReportPeriod; language: ReportLanguage;
+  generatorType: "demo" | "llm"; generatorVersion: string; contextSnapshotId: string; sections: ReportSection[]; validation: ReportValidation;
+  status: "draft" | "reviewed" | "final"; createdAt: string; updatedAt: string; reviewedAt?: string; reviewedByActorId?: string;
+  generationStartedAt: string; generatedAt: string; generationCount: number; initialDraft: ReportSection[]; finalDraft?: ReportSection[] };
+export type ReportRevision = { id: string; reportId: string; action: "generated" | "saved" | "reviewed" | "finalized"; at: string; sections: ReportSection[] };
+export type FinalReportDTO = { id: string; revision: number; kind: ReportKind; ownerActorId: string; attributionMode: AttributionMode; period: ReportPeriod; language: ReportLanguage;
+  sections: ReportSection[]; sourceSummary: Array<{ memoryRevisionId: string; summary: LocalizedText; evidence: EvidenceReference[] }>;
+  finalizedByActorId: string; finalizedAt: string; validation: ReportValidation; syntheticData: true; contextSnapshotId: string };
+export type ReportState = { drafts: ReportDraft[]; contexts: ReportContextSnapshot[]; revisions: ReportRevision[]; finals: FinalReportDTO[] };
+export const emptyReportState = (): ReportState => ({ drafts: [], contexts: [], revisions: [], finals: [] });

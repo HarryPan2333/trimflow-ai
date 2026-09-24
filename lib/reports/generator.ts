@@ -21,6 +21,7 @@ const english = (item: ActivityMemoryItem, context: ReportContextSnapshot) => {
   if (fact?.kind === "quotation") return `${scope}: quotation ${fact.quotationId} ${fact.action}; ${fact.currency} ${fact.unitPrice} at ${fact.quantity} units.`;
   if (fact?.kind === "order_milestone") return `${scope}: ${fact.action.replaceAll("_", " ")} recorded for ${fact.orderId}.`;
   if (fact?.kind === "task_status") return `${scope}: task ${fact.taskId} ${fact.action}.`;
+  if (fact?.kind === "issue_event") return `${scope}: issue ${fact.issueId} ${fact.action.replaceAll("_", " ")}.`;
   return `${scope}: ${item.subtype.replaceAll("_", " ")} recorded.`;
 };
 const factBlock = (item: ActivityMemoryItem, context: ReportContextSnapshot, index: number): ReportBlock => ({
@@ -37,8 +38,17 @@ export class DemoReportGenerator implements ReportGenerator {
     const sections: ReportSection[] = [];
     const verified = memory.filter((item) => !item.manual);
     if (context.period.kind === "weekly" && verified.length) sections.push({ id: "highlights", title: { zh: "本周重点", en: "Weekly Highlights" }, blocks: [{ id: `${reportId}:highlights`, kind: "fact", text: { zh: `本周有 ${verified.length} 项可追溯的业务活动，涉及 ${new Set(verified.map((item) => item.projectId).filter(Boolean)).size} 个项目。`, en: `${verified.length} traceable business activities across ${new Set(verified.map((item) => item.projectId).filter(Boolean)).size} projects this week.` }, memoryRevisionIds: verified.map((item) => item.id), factIds: verified.flatMap((item) => item.facts.map((fact) => fact.id)), origin: "demo_generator", validation: "valid", aggregateCount: verified.length }] });
+    const issueSections = [
+      { id: "issues_risks", title: { zh: "问题与风险", en: "Issues & Risks" }, kinds: ["issue_reported"] },
+      { id: "corrective_actions", title: { zh: "纠正行动", en: "Corrective Actions" }, kinds: ["action_completed"] },
+      { id: "resolved_problems", title: { zh: "已解决问题", en: "Resolved Problems" }, kinds: ["issue_resolved", "customer_accepted"] },
+    ];
+    for (const section of issueSections) {
+      const matches = memory.filter((item) => section.kinds.includes(item.subtype) && item.facts.some((fact) => fact.kind === "issue_event"));
+      if (matches.length) sections.push({ id: section.id, title: section.title, blocks: matches.map((item, index) => factBlock(item, context, index)) });
+    }
     for (const category of Object.keys(labels) as Array<keyof typeof labels>) {
-      const matches = memory.filter((item) => item.category === category);
+      const matches = memory.filter((item) => item.category === category && !item.facts.some((fact) => fact.kind === "issue_event"));
       if (!matches.length) continue;
       if (context.period.kind === "daily") sections.push({ id: category, title: labels[category], blocks: matches.map((item, index) => factBlock(item, context, index)) });
       else {

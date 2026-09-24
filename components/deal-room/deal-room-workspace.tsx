@@ -30,9 +30,9 @@ const fieldKeys = {
   nextActions: "deal.nextActions", openQuestions: "deal.openQuestions",
 } as const;
 
-export function DealRoomWorkspace({ state, accounts, projects, samples, quotations, roomId, onRoomChange, onBack, onAccount, onProject, onOpenActivity, run, onApply }: {
+export function DealRoomWorkspace({ state, accounts, projects, samples, quotations, roomId, onRoomChange, onBack, onAccount, onProject, onOpenActivity, onSuggestIssue, run, onApply }: {
   state: DealRoomState; accounts: AccountState; projects: Project[]; samples: SampleWorkspace; quotations: QuotationWorkspace;
-  roomId: string; onRoomChange: (id: string) => void; onBack: () => void; onAccount: (id: string) => void; onProject: (project: Project) => void; onOpenActivity: () => void;
+  roomId: string; onRoomChange: (id: string) => void; onBack: () => void; onAccount: (id: string) => void; onProject: (project: Project) => void; onOpenActivity: () => void; onSuggestIssue: (messageId: string) => void;
   run: (command: (state: DealRoomState) => DealRoomState, success: string) => boolean; onApply: (proposalId: string, actorId: string) => boolean;
 }) {
   const { language, t, text, label, formatDate } = useI18n();
@@ -70,6 +70,7 @@ export function DealRoomWorkspace({ state, accounts, projects, samples, quotatio
     <button className="back-link" onClick={onBack}>‹ {t("deal.back")}</button>
     <PageHeader title={t("deal.title")} subtitle={t("deal.subtitle")} actions={<Badge tone="blue">DEMO / {t("deal.rooms")}</Badge>} />
     <div className="deal-notice"><span>✦</span><span>{t("deal.demo")} {t("deal.noAuto")}</span></div>
+    {messages.length > 0 && <div className="issue-actions"><Button variant="secondary" onClick={() => onSuggestIssue(messages.at(-1)!.id)}>{language === "zh" ? "将最新讨论标为待审核问题线索" : "Flag latest discussion as an issue suggestion"}</Button><small>{language === "zh" ? "仅建立线索，需人工审核后才能创建问题。" : "Creates a lead only; human review is required before issue creation."}</small></div>}
     <div className="deal-grid">
       <aside className="deal-context">
         <Card><h2>{t("deal.rooms")}</h2><div className="deal-room-picker">{rooms.map((item) => <button key={item.id} className={item.id === room.id ? "active" : ""} onClick={() => onRoomChange(item.id)}><span>◎</span><strong>{text(item.title)}</strong><small>{state.proposals.filter((p) => p.roomId === item.id && (p.status === "suggested" || p.status === "reviewed")).length}</small></button>)}</div></Card>

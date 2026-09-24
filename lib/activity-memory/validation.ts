@@ -54,6 +54,13 @@ export function validateMemoryItem(item: ActivityMemoryItem, sources: BusinessSo
       }
       if (fact.action === "shipment_departed" && (!order?.executionTimeline?.some((row) => row.id === fact.milestoneId && row.title === "Shipment Departed") || !sources.shipments.some((row) => row.purchaseOrderId === fact.orderId && Boolean(row.departedDate) && ["Shipped", "In Transit", "Delivered"].includes(row.status)))) issues.push("shipment_not_departed");
     }
+    if (fact.kind === "issue_event") {
+      const event = sources.issues?.events.find((row) => row.id === fact.eventId && row.issueId === fact.issueId);
+      const issue = sources.issues?.issues.find((row) => row.id === fact.issueId);
+      if (!event || !issue || event.kind !== fact.action || issue.projectId !== item.projectId || issue.accountId !== item.accountId) issues.push("issue_scope_mismatch");
+      if (event?.reportingRole === "activity" && !event.sourceRefs.length) issues.push("issue_event_lacks_evidence");
+      if (fact.action === "customer_accepted" && !sources.issues?.responses.some((row) => row.id === event?.relatedId && row.issueId === fact.issueId && row.type === "accepted_resolution" && row.acceptanceEvidence)) issues.push("customer_acceptance_unproved");
+    }
   }
   for (const proposalRef of item.evidence.filter((ref) => ref.recordType === "deal_proposal")) {
     const proposal = sources.dealRoom.proposals.find((row) => row.id === proposalRef.recordId);

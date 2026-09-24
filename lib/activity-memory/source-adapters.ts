@@ -5,6 +5,7 @@ import type { ActivityMemoryItem, BusinessTime, EntityRef, EvidenceReference, Ma
 import type { Communication, Contract, Delivery, NegotiationRecord, Project, PurchaseOrder, Quotation, SampleFeedback, SampleVersion, Shipment, TimelineEvent } from "../mock-data/types";
 import type { ProductLibraryData } from "../product-library/types";
 import type { TaskWorkspaceState } from "../tasks/workspace";
+import type { IssueWorkspace } from "../issues/types";
 
 export type BusinessSources = {
   accounts: AccountState; dealRoom: DealRoomState; projects: Project[];
@@ -12,6 +13,7 @@ export type BusinessSources = {
   samples: { versions: SampleVersion[]; feedback: SampleFeedback[] };
   quotations: Quotation[]; negotiations: NegotiationRecord[];
   orders: PurchaseOrder[]; contracts: Contract[]; deliveries: Delivery[]; shipments: Shipment[]; tasks: TaskWorkspaceState; products: ProductLibraryData;
+  issues?: IssueWorkspace;
   manualEntries: ManualActivityEntry[];
 };
 
@@ -85,6 +87,11 @@ export function sourceExists(sources: BusinessSources, ref: SourceRecordRef): bo
     case "target_price_signal": return sources.dealRoom.targetPriceSignals.some((item) => item.id === id);
     case "requirement": return sources.dealRoom.requirements.some((item) => item.id === id);
     case "project_product": return sources.products.projectProducts.some((item) => item.id === id);
+    case "issue_event": return sources.issues?.events.some((item) => item.id === id) ?? false;
+    case "issue_action": return sources.issues?.actions.some((item) => item.id === id) ?? false;
+    case "issue_response": return sources.issues?.responses.some((item) => item.id === id) ?? false;
+    case "order_issue": return sources.orders.some((order) => order.issues?.some((item) => item.id === id));
+    case "sample": return sources.samples.versions.some((item) => item.sampleId === id);
     case "manual_activity": return sources.manualEntries.some((item) => item.id === id);
     default: return false;
   }
@@ -229,6 +236,20 @@ export function adaptSources(sources: BusinessSources, capturedAt = DEMO_REPORT_
     category: "project_update", subtype: "product_proposed_internally", occurred: businessTime(relation.createdAt), summary: localized("Product marked proposed in project; customer presentation is not confirmed."),
     facts: [{ id: `project-product:${relation.id}:fact`, kind: "interaction", channel: "internal", detail: relation.applicationNote }],
     primary: sourceRef("project_product", relation.id), entities: [entity("product", relation.productId)], reportingRole: "background" });
+  for (const record of sources.issues?.events ?? []) {
+    if (!["issue_reported", "action_completed", "customer_accepted", "issue_resolved"].includes(record.kind)) continue;
+    const issue = sources.issues?.issues.find((row) => row.id === record.issueId);
+    if (!issue) continue;
+    const primary = sourceRef("issue_event", record.id);
+    push({ logicalEventId: `issue-event:${record.id}`, accountId: canonical(issue.accountId), projectId: issue.projectId,
+      category: record.kind === "action_completed" ? "task_update" : record.kind === "customer_accepted" ? "customer_interaction" : "project_update",
+      subtype: record.kind, occurred: businessTime(record.at), summary: record.summary,
+      facts: [{ id: `issue-event:${record.id}:fact`, kind: "issue_event", issueId: issue.id, eventId: record.id, action: record.kind as "issue_reported" | "action_completed" | "customer_accepted" | "issue_resolved" }],
+      primary, lineage: record.sourceRefs, performedByActorId: record.actorId,
+      entities: issue.orderId ? [entity("order", issue.orderId)] : issue.sampleId ? [entity("sample", issue.sampleId)] : issue.projectId !== undefined ? [entity("project", issue.projectId)] : [entity("account", issue.accountId)],
+      reportingRole: record.reportingRole === "activity" && record.sourceRefs.length > 0 ? "activity" : "background",
+      importanceReason: "evidence-backed issue milestone" });
+  }
   for (const entry of sources.manualEntries) push({ logicalEventId: `manual:${entry.id}`, accountId: entry.accountId ?? projectAccount(entry.projectId ?? -1), projectId: entry.projectId,
     category: entry.category, subtype: "manual_entry", occurred: entry.occurred, sourceRecordedAt: entry.recordedAt,
     summary: localized(entry.description), facts: [{ id: `manual:${entry.id}:fact`, kind: "interaction", channel: "manual", detail: localized(entry.description) }],

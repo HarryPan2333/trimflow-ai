@@ -11,6 +11,7 @@ export type WorkspaceView =
   | "samples"
   | "quotations"
   | "orders"
+  | "issues"
   | "fulfillment"
   | "todos"
   | "reports"
@@ -35,6 +36,7 @@ export const workspaceNavigation: Array<{
   { id: "samples", key: "nav.samples", label: "样品中心", en: "Sample Center", icon: "◈", placement: "primary" },
   { id: "quotations", key: "nav.quotations", label: "报价中心", en: "Quotation Center", icon: "¥", placement: "primary" },
   { id: "orders", key: "nav.orders", label: "订单中心", en: "Order Center", icon: "▤", placement: "primary" },
+  { id: "issues", key: "nav.issues", label: "问题与经验", en: "Issues & Playbooks", icon: "◇", placement: "primary" },
   { id: "fulfillment", key: "nav.fulfillment", label: "交付与出货", en: "Delivery & Shipment", icon: "↗", placement: "primary" },
   { id: "todos", key: "nav.todos", label: "待办事项", en: "Tasks", icon: "✓", placement: "primary" },
   { id: "reports", key: "nav.reports", label: "报告中心", en: "Reports", icon: "▥", placement: "primary" },

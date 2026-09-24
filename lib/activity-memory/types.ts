@@ -16,7 +16,8 @@ export type ActivityFact =
   | { id: string; kind: "task_status"; taskId: string; fromStatus?: string; toStatus: string; action: "created" | "completed" | "reopened" }
   | { id: string; kind: "relationship"; contactId: string; action: "discovered" | "introduced" | "added" }
   | { id: string; kind: "order_milestone"; orderId: string; action: "po_received" | "contract_confirmed" | "milestone_completed" | "shipment_departed"; milestoneId?: string }
-  | { id: string; kind: "requirement"; requirementId: string; confirmation: "pending" | "confirmed" };
+  | { id: string; kind: "requirement"; requirementId: string; confirmation: "pending" | "confirmed" }
+  | { id: string; kind: "issue_event"; issueId: string; eventId: string; action: "issue_reported" | "action_completed" | "customer_accepted" | "issue_resolved" };
 
 export type ActivityMemoryItem = {
   id: string; logicalEventId: string; revision: number; workspaceId: "demo";

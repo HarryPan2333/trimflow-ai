@@ -28,6 +28,8 @@ import type { DealRoomState } from "../../lib/deal-room/types";
 import { DealRoomEntry } from "../deal-room/deal-room-entry";
 import type { WorkspaceTask } from "../../lib/tasks/workspace";
 import type { ActivityMemoryItem } from "../../lib/activity-memory/types";
+import type { IssueWorkspace } from "../../lib/issues/types";
+import { IssueBridge } from "../issues/issue-bridge";
 
 type TabId = "overview" | "requirements" | "samples" | "quotations" | "communications" | "orders" | "timeline" | "ai";
 
@@ -42,6 +44,9 @@ type ProjectCommandCenterProps = {
   onAddProjectActivity: (event: TimelineEvent) => void;
   recentMemory: ActivityMemoryItem[];
   onOpenReports: () => void;
+  issues: IssueWorkspace;
+  onOpenIssue: (id: string) => void;
+  onCreateIssue: () => void;
   onOpenDealRoom: (id: string) => void;
   onCreateDealRoom: (accountId: string, projectId?: number) => void;
   stages: ProjectStage[];
@@ -63,7 +68,7 @@ type ProjectCommandCenterProps = {
   initialTab?: "overview" | "samples" | "quotations" | "orders";
 };
 
-export function ProjectCommandCenter({ project, accountState, dealRoomState, sharedTasks, projectActivities, onAddProjectActivity, recentMemory, onOpenReports, onOpenDealRoom, onCreateDealRoom, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, language, initialTab = "overview" }: ProjectCommandCenterProps) {
+export function ProjectCommandCenter({ project, accountState, dealRoomState, sharedTasks, projectActivities, onAddProjectActivity, recentMemory, onOpenReports, onOpenDealRoom, onCreateDealRoom, stages, onBack, onUpdateStage, showToast, aiCopilot, sampleWorkspace, quotationWorkspace, orderWorkspace, productLibrary, onBrowseProducts, onOpenProduct, onOpenSample, onOpenQuotation, onCreateQuotation, onOpenOrder, issues, onOpenIssue, onCreateIssue, language, initialTab = "overview" }: ProjectCommandCenterProps) {
   const { language: appLanguage, t, text } = useI18n();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [activityModal, setActivityModal] = useState(false);
@@ -100,6 +105,7 @@ export function ProjectCommandCenter({ project, accountState, dealRoomState, sha
       <ProjectHeader data={data} priority={priority} expectedValue={opportunity.estimatedValue} stages={stages} onBack={onBack} onUpdateStage={onUpdateStage} onAddActivity={() => setActivityModal(true)} onCreateSample={() => { setTab("samples"); showToast(appLanguage === "zh" ? "已打开项目样品；选择样品可创建后续版本" : "Project samples opened; select a sample to create a revision"); }} onCreateQuote={() => { setTab("quotations"); if (data.quotations.length) showToast(appLanguage === "zh" ? "已打开项目报价；点击记录进入谈判工作区" : "Project quotations opened; select a record to enter negotiation"); else onCreateQuotation(); }} onEditProject={() => showToast(appLanguage === "zh" ? "编辑项目为当前原型模拟操作" : "Edit project is a demo action")} />
       {accountState && <DealRoomEntry state={dealRoomState} accounts={accountState} accountId={project.clientId} projectId={project.id} onOpen={onOpenDealRoom} onCreate={() => onCreateDealRoom(project.clientId, project.id)} />}
       <Card className="report-bridge"><div><h3>{t("report.recentActivity")}</h3><p>{recentMemory.length ? `${recentMemory.length} · ${text(recentMemory[0].summary)}` : t("report.empty")}</p></div><Button variant="secondary" onClick={onOpenReports}>{t("report.openReports")} →</Button></Card>
+      <IssueBridge scope="project" issues={issues.issues.filter((issue) => issue.projectId === project.id)} onOpen={onOpenIssue} onCreate={onCreateIssue} />
 
       <Card className="project-lifecycle-card">
         <div className="lifecycle-card-head"><div><span>Lifecycle Control</span><strong>{t("project.lifecycleControl")}</strong></div><StatusBadge status={project.lifecycleStage} /></div>

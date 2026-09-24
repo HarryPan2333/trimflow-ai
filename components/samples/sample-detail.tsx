@@ -14,10 +14,12 @@ import { DesignInOpportunity, SampleCost, SampleLogistics } from "./sample-resou
 import { categoryLabels, createRevision, DEMO_DATE, demoNotice, getOpenRevisionFeedback, getSampleStatus, getSpecificationRows, severityLabels } from "./sample-data";
 import type { SampleAction, SampleContext } from "./sample-data";
 import { useI18n } from "../providers/language-provider";
+import type { Issue } from "../../lib/issues/types";
+import { IssueBridge } from "../issues/issue-bridge";
 
 type ModalKind = "feedback" | "revision" | "sent" | "approved" | null;
 
-export function SampleDetail({ context, language, dispatch, onBack, onProject, onClient, onCreateQuotation, showToast }: { context: SampleContext; language: InterfaceLanguage; dispatch: Dispatch<SampleAction>; onBack: () => void; onProject: () => void; onClient: () => void; onCreateQuotation: () => void; showToast: (message: string) => void }) {
+export function SampleDetail({ context, language, dispatch, onBack, onProject, onClient, onCreateQuotation, issues, onOpenIssue, onCreateIssue, showToast }: { context: SampleContext; language: InterfaceLanguage; dispatch: Dispatch<SampleAction>; onBack: () => void; onProject: () => void; onClient: () => void; onCreateQuotation: () => void; issues: Issue[]; onOpenIssue: (id: string) => void; onCreateIssue: () => void; showToast: (message: string) => void }) {
   const [modal, setModal] = useState<ModalKind>(null);
   const [resolveId, setResolveId] = useState<string | null>(null);
   const { t, label, text } = useI18n();
@@ -51,6 +53,7 @@ export function SampleDetail({ context, language, dispatch, onBack, onProject, o
   const primaryContact = context.contacts.find((contact) => contact.isPrimary)?.name ?? "Demo Contact";
   return <div className="sample-workspace sample-detail">
     <SampleHeader context={context} language={language} onBack={onBack} onProject={onProject} onClient={onClient} onAction={setModal} />
+    <IssueBridge scope="sample" issues={issues} onOpen={onOpenIssue} onCreate={onCreateIssue} />
     <div className="sample-journey" aria-label={t("sample.flowLabel")}><span>{t("sample.journey.idea")}</span><i>→</i><span>{t("sample.journey.requirement")}</span><i>→</i><span>{t("sample.journey.request")}</span><i>→</i><strong>{t("sample.journey.development")}</strong><i>→</i><span>{t("sample.journey.feedback")}</span><i>→</i><span>{t("sample.journey.approval")}</span><i>→</i><span>{t("quotation.table.id")}</span></div>
     <div className="sample-detail-grid"><div className="sample-main-column">
       <Card className="sample-section sample-current-summary"><div><span>{t("sample.currentDevelopment")}</span><h2>{text(context.current?.summary ?? t("sample.currentWaiting"))}</h2><p>{openFeedback.length ? `${t("sample.revisionPending", { count: openFeedback.length })} ${text(context.current?.reasonForChange ?? "")}` : text(context.current?.reasonForChange ?? context.sample.nextAction)}</p></div><div><span>{t("sample.latestVersion")}</span><strong>{context.current?.version}</strong><small>{label(getSampleStatus(context))}</small></div></Card>

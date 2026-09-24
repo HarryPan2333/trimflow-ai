@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createIssueWorkspace } from "../lib/issues/repository";
 import { addIssueAction, addIssueSuggestion, addProductImprovement, applyIssueSuggestion, completeIssueAction, createIssue, recordCustomerResponse, resolveIssue, reviewIssueSuggestion, reviewProductImprovement, transitionIssue, updateRootCause } from "../lib/issues/commands";
 import { customerSafeIssue } from "../lib/issues/integration";
+import { formatIssueError } from "../lib/issues/labels";
 import { validateIssue } from "../lib/issues/validation";
 import { createAccountState } from "../lib/accounts/repository";
 import { createDealRoomState } from "../lib/deal-room/repository";
@@ -22,6 +23,12 @@ const at = "2026-08-05T12:00:00Z";
 const context = () => ({ accounts: createAccountState(), projects: structuredClone(projects), samples: createSampleWorkspace(), orders: createOrderWorkspace(), products: mockProductLibraryRepository.load() });
 const both = (zh: string, en = zh) => ({ zh, en });
 const newIssue = (): Issue => ({ ...structuredClone(createIssueWorkspace().issues[1]), id: "IS-TEST-01", title: both("演示包装核查", "Demo packaging check"), description: both("需核查包装说明", "Packaging instructions require review"), sourceRefs: [{ provider: "trimflow", recordType: "purchase_order", recordId: "po-efc-2411" }] });
+
+test("validation codes become user-facing Chinese and English messages", () => {
+  assert.equal(formatIssueError(new Error("invalid_severity,account_project_mismatch"), "zh"), "请选择有效的严重程度；客户与项目不匹配");
+  assert.equal(formatIssueError(new Error("invalid_severity"), "en"), "Select a valid severity");
+  assert.equal(formatIssueError(new Error("unknown_error"), "zh"), "操作未完成，请核对输入与关联资料");
+});
 
 test("seeded issues have coherent account, project, sample/order and evidence references", () => {
   const state = createIssueWorkspace(); const refs = context();
